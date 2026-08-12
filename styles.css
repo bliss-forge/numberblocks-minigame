@@ -9236,6 +9236,30 @@ body[data-mode="delivery"] #stage {
 .dv-star { color: #cfd6de; }
 .dv-star[data-on="true"] { color: #f7b715; }
 
+/* ── 리듬 하역 ───────────────────────────────────────────────────── */
+
+/* ---[ ● ]--- 구슬이 한 박(80BPM = 750ms)에 막대를 가로지른다.
+   애니메이션을 반 박 당겨 시작해 정박마다 정확히 한가운데를 지나고,
+   무대가 박마다 다시 그려지므로 위상이 계속 맞는다. */
+.dv-beat-marker {
+  transform-box: view-box;
+  animation: dv-beat-sweep 750ms linear infinite;
+  animation-delay: -375ms;
+}
+
+@keyframes dv-beat-sweep {
+  from { transform: translateX(-280px); }
+  to { transform: translateX(280px); }
+}
+
+/* 움직임을 줄이겠다고 한 기기에서는 구슬을 한가운데 세운다 —
+   박자는 비트 칩과 소리가 알려 준다. */
+@media (prefers-reduced-motion: reduce) {
+  .dv-beat-marker { animation: none; }
+}
+
+.dv-key-beat { font-size: clamp(15px, 1.9vw, 22px); }
+
 /* ── 피날레 ──────────────────────────────────────────────────────── */
 
 /* 단지 전경 아래에 눕는 마무리 줄 — 세로로 쌓으면 그림이 눌려 가로로 편다. */
@@ -9480,6 +9504,14 @@ body[data-mode="delivery"] #stage {
 
 /* 실사 열차 위를 가로지르는 레거시 전경 모션은 장면 준비 즉시 제거한다. */
 .ktx-game[data-realistic="ready"] .ktx-view-side .ktx-side-near {
+  display: none;
+}
+
+/* 레거시 만화 속도선 — 화면 좌우 끝 1% 자리에 흰 파선 두 줄이 실사 사진 위로
+   그대로 떠 있었다(옆 창 근처의 옅은 사각형 얼룩, 대장 지적 2026-08-11).
+   실사 경로에는 전용 엣지 스트릭(.ktx-motion-cab-window::before)과 속도
+   블러가 이미 있다. display:none이라 무한 애니메이션도 함께 멈춘다. */
+.ktx-game[data-realistic="ready"] .ktx-speedlines {
   display: none;
 }
 
@@ -10115,7 +10147,8 @@ body[data-mode="delivery"] #stage {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: center / cover no-repeat url("assets/train-realistic/cab-day.webp");
+  background: center / cover no-repeat
+    var(--cab-base-image, url("assets/train-realistic/cab-day.webp"));
   transform: translate3d(0, var(--cab-base-y, 0px), 0)
     scale(var(--cab-base-scale, 1.035));
   transform-origin: 50% 30%;
@@ -10123,13 +10156,9 @@ body[data-mode="delivery"] #stage {
   will-change: transform;
 }
 
-.ktx-motion-scene[data-land="tunnel"] .ktx-motion-cab-base {
-  background-image: url("assets/train-realistic/cab-tunnel.webp");
-}
-
-.ktx-motion-scene[data-sky="night"]:not([data-land="tunnel"]) .ktx-motion-cab-base {
-  background-image: url("assets/train-realistic/cab-night.webp");
-}
+/* 터널·야간 전용 규칙은 없앴다 — 우선순위(터널 > 밤 > 새벽·노을 > 지형)는
+   realisticCabAsset 한 곳에만 있고 --cab-base-image로 들어온다. CSS에 같은
+   규칙을 두면 새벽·노을처럼 한쪽에만 추가되어 조용히 갈라진다. */
 
 .ktx-motion-cab-ground {
   z-index: 1;
@@ -10473,11 +10502,97 @@ body[data-mode="delivery"] #stage {
   display: block;
 }
 
-/* 운전실 뷰에서 사진 플레이트 2장은 프레임에 완전히 가려진다 — 보이지 않는
-   대형 래스터 합성 낭비를 끊는다. display:none이 아니라 visibility인 이유:
-   크로스페이드 animationend가 와야 플레이트 상태 머신이 안 멈춘다. */
+/* 운전실 옆 창 — 전면창 사다리꼴(cab-window, z5)은 가운데만 덮는다. 그 바깥,
+   즉 마스크의 투명한 좌우 옆 창에는 아무 계층도 없어서 장면 배경색이 그대로
+   비쳤다(하늘색 삼각 쐐기, 대장 지적 2026-08-11). 사진 판을 여기서 살려
+   유리 너머로 바깥 풍경이 흐르게 한다 — 전면창은 cab-window가 덮으므로
+   앞 시야는 그대로다. 플레이트를 숨기던 예전 최적화는 이 결함의 원인이라 뺀다.
+   블러는 속도 밴드로 계단화한다: 매 틱 반경이 바뀌면 대형 래스터를 다시 그린다. */
 .ktx-game[data-view="cab"] .ktx-motion-plate {
-  visibility: hidden;
+  /* 유리 한 장 너머로 보는 값 — 속도(블러)와 시간대(밝기·채도·색조)를 변수로
+     나눠 두고 여기서 한 번만 합성한다. 규칙을 나눠 쓰면 밴드×시간대 조합마다
+     filter 전체를 다시 적어야 하고, 한쪽만 고쳐 놓고 다른 쪽을 잊게 된다. */
+  filter:
+    brightness(var(--cab-glass-bright, .93))
+    saturate(var(--cab-glass-sat, .95))
+    sepia(var(--cab-glass-warm, 0))
+    blur(var(--cab-glass-blur, 1px));
+  /* 사진 판의 지평선은 판 높이 ~62%에 있어 옆 창(상단 40%)에는 하늘만 걸렸다.
+     지평선을 전면창 지평선 높이로 끌어올려 기둥 좌우가 이어져 보이게 한다.
+     밀려 올라간 판 아래쪽은 불투명한 계기판 뒤라 드러나지 않는다. */
+  transform: translate3d(var(--motion-plate-x, var(--motion-scene-x)),
+      var(--cab-plate-y, -26%), 0)
+    scale(var(--cab-plate-scale, 1.14));
+  transform-origin: 50% 30%;
+}
+
+/* 속도 = 흐름의 양. 밴드로 계단화한다(매 틱 반경이 바뀌면 재래스터). */
+.ktx-game[data-view="cab"] .ktx-motion-scene[data-speed-band="cruise"] {
+  --cab-glass-blur: 2.5px;
+}
+
+.ktx-game[data-view="cab"] .ktx-motion-scene[data-speed-band="fast"] {
+  --cab-glass-blur: 4px;
+}
+
+.ktx-game[data-view="cab"] .ktx-motion-scene[data-speed-band="very-fast"] {
+  --cab-glass-blur: 6px;
+}
+
+/* 시간대 — 사진 판은 전부 주간 촬영이라, 옆 창이 보이기 시작하자 밤 구간에서
+   전면창은 야간 사진인데 옆 창만 대낮으로 빛났다. 바깥 뷰의 장면 틴트와 같은
+   방향으로 판 자체를 물들인다(틴트 레이어는 z8이라 운전실에 쓰면 계기판까지
+   덮는다 — 그래서 필터로 판에만 건다). */
+/* 값은 전면창 사진과 나란히 놓고 골랐다 — sepia만 올리면 갈색으로 죽어서
+   채도를 함께 올려야 노을·새벽 하늘색과 같은 계열로 읽힌다. */
+.ktx-game[data-view="cab"] .ktx-motion-scene[data-sky="dawn"] {
+  --cab-glass-bright: .64;
+  --cab-glass-sat: .95;
+  --cab-glass-warm: .34;
+}
+
+.ktx-game[data-view="cab"] .ktx-motion-scene[data-sky="sunset"] {
+  --cab-glass-bright: .72;
+  --cab-glass-sat: 1.15;
+  --cab-glass-warm: .5;
+}
+
+/* 밤 값은 바깥 뷰의 야간 틴트(#0d1428 · 0.5)와 같은 어둡기를 목표로 잡았다 —
+   더 내리면 옆 창만 새까매져 전면창 야간 사진과 또 어긋난다. */
+.ktx-game[data-view="cab"] .ktx-motion-scene[data-sky="night"] {
+  --cab-glass-bright: .5;
+  --cab-glass-sat: .55;
+}
+
+/* 유리 자체 — 옆 창은 마스크가 완전 투명이라 유리가 없는 것처럼 보였다.
+   판 위에 얇은 청회색 막과 위에서 아래로 옅어지는 반사를 얹어 "유리 한 장"을
+   만든다. 전면창은 cab-window(z5)가 덮으므로 이 막은 옆 창에만 걸린다.
+   z는 판(1)보다 위, 전면창(5)보다 아래. */
+.ktx-motion-glass {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: none;
+  pointer-events: none;
+  background:
+    linear-gradient(196deg,
+      rgba(255, 255, 255, .16) 0 14%,
+      rgba(255, 255, 255, .05) 22% 38%,
+      transparent 46%),
+    linear-gradient(to bottom,
+      rgba(150, 178, 198, .22), rgba(96, 116, 134, .12) 62%, transparent);
+}
+
+.ktx-game[data-view="cab"] .ktx-motion-glass {
+  display: block;
+}
+
+.ktx-game[data-view="cab"] .ktx-motion-scene[data-sky="night"] .ktx-motion-glass {
+  background:
+    linear-gradient(196deg,
+      rgba(190, 214, 255, .1) 0 14%, transparent 40%),
+    linear-gradient(to bottom,
+      rgba(18, 26, 44, .3), rgba(12, 18, 32, .18) 62%, transparent);
 }
 
 /* ── 시간대 틴트(협회 후반 검수 1) — 사진 자산이 전부 주간이라 야간·노을·
@@ -10735,5 +10850,32 @@ body[data-mode="delivery"] #stage {
   .ktx-motion-train-rig,
   .ktx-motion-cab-frame {
     will-change: auto;
+  }
+}
+
+/* Playtest-guided polish for modes 6-9: preserve the existing visual language. */
+.subway-plan-step[data-current="true"] {
+  box-shadow: 0 0 0 2px rgba(244, 197, 66, .62);
+}
+.subway-rail .route-pad button:active,
+.dv-key:active,
+.dv-floorkey:active,
+.dv-bell:active {
+  transform: translateY(2px);
+  filter: brightness(.96);
+}
+.pp-tube[data-hint="sparkle"] .pp-tube-body {
+  outline: 3px solid rgba(244, 197, 66, .65);
+  outline-offset: 4px;
+}
+.dv-beat-marker {
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .85));
+}
+@media (prefers-reduced-motion: reduce) {
+  .subway-rail .route-pad button:active,
+  .dv-key:active,
+  .dv-floorkey:active,
+  .dv-bell:active {
+    transform: none;
   }
 }

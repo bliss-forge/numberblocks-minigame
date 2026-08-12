@@ -1,5 +1,6 @@
 import {
   REALISTIC_MOTION_ASSETS,
+  realisticCabAsset,
   realisticEventAsset,
   realisticMotionAssets
 } from "./ktx-realistic-assets.mjs";
@@ -105,6 +106,12 @@ function applyFrame(scene, state, band, controller = null) {
   const photoX = monotonicPhotoPan(state.x);
   scene.style.setProperty("--motion-scene-x", `${photoX}px`);
   scene.style.setProperty("--motion-far-x", `${photoX}px`);
+  // 전면창 사진도 시간대·지형을 따른다. 옆 창에 사진 판이 보이기 시작하면서
+  // "옆은 들판, 앞은 도시"가 드러났다(대장 지적 2026-08-11). 우선순위는
+  // realisticCabAsset 한 곳에만 두고 CSS는 이 변수를 쓴다 — 규칙을 CSS에
+  // 복제하면 둘이 갈라진다.
+  scene.style.setProperty("--cab-base-image",
+    `url("${realisticCabAsset(band.sky ?? "day", frame.land)}")`);
   const cabProgress = cabForwardProgress(state.x);
   scene.style.setProperty("--cab-base-scale",
     (1.035 + cabProgress * .035).toFixed(4));
@@ -582,7 +589,10 @@ export function buildRealisticMotionScene(document, state, onStateChange) {
   cabRig.append(cabWindow, cabFrame);
   Object.assign(controller, { station, stationSign, train, cabFrame });
 
-  scene.append(...plates, stationViewport, stationSign,
+  // 운전실 옆 창의 유리 한 장 — 판(z1) 위, 전면창(z5) 아래에 얹혀 좌우 창에만
+  // 걸린다. 없으면 옆 창이 "유리 없는 구멍"으로 보인다.
+  const glass = el(document, "div", "ktx-motion-glass");
+  scene.append(...plates, glass, stationViewport, stationSign,
     mid, eventSprite, track, oncoming, near, cabRig, trainRig);
   scene.dataset.readiness = "pending";
   applyFrame(scene, state, { sky: state.sky, land: state.land }, controller);

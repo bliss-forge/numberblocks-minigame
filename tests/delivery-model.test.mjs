@@ -4,7 +4,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   BLOCKED_CELLS,
-  COMMAND_SLOTS,
   DELIVERY_TARGET,
   GRID_COLUMNS,
   GRID_ROWS,
@@ -14,17 +13,18 @@ import {
   STREAK_BONUS_SLOTS,
   TRUCK_START,
   blockedAt,
-  clearCommands,
   createDelivery,
   deliverParcel,
   houseAt,
   moveCorridorFocus,
   moveTrayFocus,
+  boardElevator,
+  passRhythmBox,
   pressFloor,
-  pushCommand,
+  driveStep,
   ringBell,
-  runCommands,
 } from "../src/delivery-model.mjs";
+import { BEAT_MS, RHYTHM_TARGET } from "../src/delivery-rhythm.mjs";
 
 const TOP_FLOOR = { easy: 5, steady: 7, challenge: 7 };
 
@@ -58,21 +58,27 @@ function shortestMoves(goal) {
 // 목표 집까지 실제로 몰고 간다. 테스트 전용 최단 경로 조종사.
 function driveToTarget(state) {
   const goal = state.order.cell;
-  const horizontal = goal.x - state.drive.truck.x;
-  const vertical = goal.y - state.drive.truck.y;
-  const moves = [];
-  for (let index = 0; index < Math.abs(horizontal); index += 1) {
-    moves.push(horizontal > 0 ? "right" : "left");
+  let events = [];
+  while (state.drive.truck.x !== goal.x) {
+    events = driveStep(state, goal.x > state.drive.truck.x ? "right" : "left");
   }
-  for (let index = 0; index < Math.abs(vertical); index += 1) {
-    moves.push(vertical > 0 ? "down" : "up");
+  while (state.drive.truck.y !== goal.y) {
+    events = driveStep(state, goal.y > state.drive.truck.y ? "down" : "up");
   }
-  moves.forEach(direction => pushCommand(state, direction));
-  return runCommands(state);
+  return events;
+}
+
+// 도착 다음은 리듬 하역이다. 판정을 시험하는 곳이 아니면 정박에 딱 맞춰 끝낸다.
+function unload(state) {
+  for (let index = 1; index <= RHYTHM_TARGET; index += 1) {
+    passRhythmBox(state, index * BEAT_MS);
+  }
+  return boardElevator(state);
 }
 
 function completeDelivery(state) {
   driveToTarget(state);
+  unload(state);
   pressFloor(state, state.order.floor);
   const wanted = state.corridor.units.indexOf(state.order.unit);
   while (state.corridor.focus < wanted) moveCorridorFocus(state, 1);
@@ -84,10 +90,10 @@ function completeDelivery(state) {
 
 /* ── 지도 · 도달 가능성 ──────────────────────────────────────────── */
 
-test("모든 집이 명령 네 칸 안에 닿는다", () => {
+test("모든 집이 도로를 따라 닿는다", () => {
   for (const cell of HOUSE_CELLS) {
     const steps = shortestMoves(cell);
-    assert.ok(steps <= COMMAND_SLOTS, `(${cell.x},${cell.y}) 까지 ${steps} 칸 — 슬롯보다 많다`);
+    assert.ok(Number.isFinite(steps), `(${cell.x},${cell.y}) 로 가는 길이 없다`);
   }
 });
 
@@ -164,46 +170,41 @@ test("목표 집은 지도 위 실제 집이다", () => {
 
 /* ── ① 단지 운전 ────────────────────────────────────────────────── */
 
-test("이동 명령은 네 칸까지만 쌓인다", () => {
+test("방향키 한 번에 한 칸씩 바로 움직인다", () => {
   const state = createDelivery("easy", 3);
-  for (let index = 0; index < COMMAND_SLOTS; index += 1) {
-    assert.deepEqual(typesOf(pushCommand(state, "right")), ["command-added"]);
-  }
-  assert.deepEqual(typesOf(pushCommand(state, "right")), ["command-full"]);
-  assert.equal(state.drive.queue.length, COMMAND_SLOTS);
+  const events = driveStep(state, "right");
 
-  assert.deepEqual(typesOf(clearCommands(state)), ["command-cleared"]);
-  assert.equal(state.drive.queue.length, 0);
-  assert.deepEqual(clearCommands(state), [], "빈 큐를 또 비우면 조용하다");
+  assert.deepEqual(typesOf(events), ["drive-step"]);
+  assert.deepEqual(state.drive.truck, { x: TRUCK_START.x + 1, y: TRUCK_START.y });
+  assert.equal(state.drive.facing, "right");
 });
 
-test("빈 채로 출발하면 알려만 주고 아무 일도 없다", () => {
-  const state = createDelivery("easy", 3);
-  assert.deepEqual(typesOf(runCommands(state)), ["command-empty"]);
-  assert.deepEqual(state.drive.truck, { ...TRUCK_START });
-});
-
-test("격자 밖이나 막힌 칸으로는 못 간다 — 거기서 멈춘다", () => {
+test("격자 밖이나 막힌 칸으로는 못 간다 — 제자리에서 방향만 돌아본다", () => {
   const state = createDelivery("easy", 5);
   state.drive.truck = { x: 0, y: 1 };
-  pushCommand(state, "left"); // 격자 밖
-  const events = runCommands(state);
-  assert.ok(typesOf(events).includes("drive-blocked"));
+  assert.deepEqual(typesOf(driveStep(state, "left")), ["drive-edge"]);
   assert.deepEqual(state.drive.truck, { x: 0, y: 1 }, "막히면 제자리");
+  assert.equal(state.drive.facing, "left", "가려던 쪽은 바라본다");
 
   const pond = createDelivery("easy", 5);
   pond.drive.truck = { x: 0, y: 1 };
-  pushCommand(pond, "down"); // 연못
-  assert.ok(typesOf(runCommands(pond)).includes("drive-blocked"));
+  const blocked = driveStep(pond, "down"); // 연못
+  assert.deepEqual(typesOf(blocked), ["drive-blocked"]);
+  assert.equal(blocked[0].kind, "pond");
   assert.deepEqual(pond.drive.truck, { x: 0, y: 1 });
 });
 
-test("다른 집에 도착하면 벌점 없이 다시 하라고 한다", () => {
+test("모르는 방향은 조용히 무시된다", () => {
+  const state = createDelivery("easy", 3);
+  assert.deepEqual(driveStep(state, "northwest"), []);
+  assert.deepEqual(state.drive.truck, { ...TRUCK_START });
+});
+
+test("다른 집에 들어서면 벌점 없이 다시 하라고 한다", () => {
   const state = createDelivery("steady", 11);
   const other = state.houses.find(house => house.unit !== state.order.unit);
-  state.drive.truck = { x: other.cell.x, y: other.cell.y === 0 ? 1 : 1 };
-  pushCommand(state, other.cell.y === 0 ? "up" : "down");
-  const events = runCommands(state);
+  state.drive.truck = { x: other.cell.x, y: 1 };
+  const events = driveStep(state, other.cell.y === 0 ? "up" : "down");
 
   assert.ok(typesOf(events).includes("drive-miss"));
   assert.equal(state.phase, "drive", "단계는 그대로");
@@ -211,52 +212,38 @@ test("다른 집에 도착하면 벌점 없이 다시 하라고 한다", () => {
   assert.equal(state.delivered, 0);
 });
 
-test("한 칸도 못 가면 이미 서 있던 집을 다시 판정하지 않는다", () => {
-  // 다른 집에 잘못 도착한 뒤 벽 쪽으로 명령을 넣으면, 트럭은 그대로인데
-  // 도착 판정이 다시 돌아 실수가 부풀고 "길이 아니에요" 안내가 묻혔다.
+test("같은 집을 오가도 실수는 한 번만 센다", () => {
+  // 실시간 주행이라 잘못 든 집을 몇 번이고 드나들 수 있다.
+  // 드나든 횟수만큼 실수가 쌓이면 연속 성공 보너스가 억울하게 끊긴다.
   const state = createDelivery("steady", 2);
   const other = state.houses.find(house => house.unit !== state.order.unit && house.cell.y === 0);
   state.drive.truck = { x: other.cell.x, y: 1 };
-  pushCommand(state, "up");
-  assert.ok(typesOf(runCommands(state)).includes("drive-miss"), "먼저 다른 집에 도착해 둔다");
 
-  const mistakes = state.order.mistakes;
-  pushCommand(state, "up"); // 집에서 위 → 격자 밖
-  const events = typesOf(runCommands(state));
+  const first = driveStep(state, "up");
+  assert.equal(first.find(event => event.type === "drive-miss").first, true);
+  assert.equal(state.order.mistakes, 1);
 
-  assert.ok(events.includes("drive-blocked"), "막혔다고 알려야 한다");
-  assert.equal(events.includes("drive-miss"), false, "제자리인데 도착을 또 판정했다");
-  assert.equal(state.order.mistakes, mistakes, "제자리인데 실수가 늘었다");
-  assert.deepEqual(state.drive.truck, { ...other.cell }, "트럭이 움직이면 안 된다");
+  driveStep(state, "down");
+  const again = driveStep(state, "up");
+  assert.equal(again.find(event => event.type === "drive-miss").first, false);
+  assert.equal(state.order.mistakes, 1, "같은 집을 또 밟았다고 실수가 늘면 안 된다");
 });
 
-test("목표 집에 닿으면 엘리베이터로 넘어간다", () => {
+test("목표 집에 닿으면 하역으로, 상자를 다 내리면 엘리베이터로 넘어간다", () => {
   const state = createDelivery("steady", 21);
   const events = driveToTarget(state);
   assert.ok(typesOf(events).includes("drive-arrived"));
-  assert.equal(state.phase, "elevator");
+  assert.equal(state.phase, "rhythm", "도착 다음은 하역이다");
   assert.deepEqual(state.drive.truck, { ...state.order.cell });
+
+  assert.deepEqual(typesOf(unload(state)), ["rhythm-boarding"]);
+  assert.equal(state.phase, "elevator");
 });
 
-test("출발하면 씬이 굴릴 경로가 나온다", () => {
+test("도착한 뒤에는 방향키가 먹지 않는다", () => {
   const state = createDelivery("steady", 21);
-  const events = driveToTarget(state);
-  const path = events.find(event => event.type === "drive-path")?.path;
-  assert.ok(Array.isArray(path) && path.length > 0);
-  for (const point of path) {
-    assert.ok(Number.isInteger(point.x) && Number.isInteger(point.y));
-    assert.ok(["up", "down", "left", "right"].includes(point.facing));
-  }
-});
-
-test("집 칸에 들어서면 남은 명령을 지나쳐 가지 않는다", () => {
-  const state = createDelivery("steady", 33);
-  const house = state.houses.find(item => item.cell.x === 2 && item.cell.y === 0);
-  state.drive.truck = { x: 2, y: 1 };
-  pushCommand(state, "up"); // 집으로
-  pushCommand(state, "up"); // 그 너머 — 실행되면 안 된다
-  runCommands(state);
-  assert.deepEqual(state.drive.truck, { ...house.cell });
+  driveToTarget(state);
+  assert.deepEqual(driveStep(state, "left"), [], "하역 중에 트럭이 움직이면 안 된다");
 });
 
 /* ── ② 엘리베이터 ───────────────────────────────────────────────── */
@@ -264,6 +251,7 @@ test("집 칸에 들어서면 남은 명령을 지나쳐 가지 않는다", () =
 test("다른 층을 눌러도 벌점 없이 다시 누를 수 있다", () => {
   const state = createDelivery("challenge", 8);
   driveToTarget(state);
+  unload(state);
   const wrong = state.order.floor === 9 ? 8 : state.order.floor + 1;
 
   const events = pressFloor(state, wrong);
@@ -279,6 +267,7 @@ test("다른 층을 눌러도 벌점 없이 다시 누를 수 있다", () => {
 test("층 버튼은 1~9만 받는다", () => {
   const state = createDelivery("easy", 9);
   driveToTarget(state);
+  unload(state);
   assert.deepEqual(pressFloor(state, 0), []);
   assert.deepEqual(pressFloor(state, 10), []);
   assert.deepEqual(pressFloor(state, "x"), []);
@@ -290,6 +279,7 @@ test("층 버튼은 1~9만 받는다", () => {
 test("복도 초점은 문 셋 사이에서만 움직인다", () => {
   const state = createDelivery("steady", 12);
   driveToTarget(state);
+  unload(state);
   pressFloor(state, state.order.floor);
 
   assert.deepEqual(typesOf(moveCorridorFocus(state, -1)), ["corridor-edge"]);
@@ -304,6 +294,7 @@ test("복도 초점은 문 셋 사이에서만 움직인다", () => {
 test("틀린 문에서 초인종을 눌러도 벌점이 없다", () => {
   const state = createDelivery("steady", 12);
   driveToTarget(state);
+  unload(state);
   pressFloor(state, state.order.floor);
   const wrongIndex = state.corridor.units.findIndex(unit => unit !== state.order.unit);
   state.corridor.focus = wrongIndex;
@@ -329,6 +320,7 @@ test("트레이 순서는 과일 · 화장품 · 장난감 고정이다", () => 
 test("다른 물건을 건네도 벌점 없이 다시 고를 수 있다", () => {
   const state = createDelivery("steady", 14);
   driveToTarget(state);
+  unload(state);
   pressFloor(state, state.order.floor);
   state.corridor.focus = state.corridor.units.indexOf(state.order.unit);
   ringBell(state);
@@ -363,6 +355,7 @@ test("연속 성공 보너스는 실수 없이 끝낸 건만 센다", () => {
   // 같은 시드로 다시 시작해 층을 한 번 틀려 본다.
   const slipped = createDelivery("steady", 16);
   driveToTarget(slipped);
+  unload(slipped);
   pressFloor(slipped, slipped.order.floor === 9 ? 8 : slipped.order.floor + 1); // 틀린 층
   pressFloor(slipped, slipped.order.floor);
   slipped.corridor.focus = slipped.corridor.units.indexOf(slipped.order.unit);
@@ -406,8 +399,8 @@ test("단계에 맞지 않는 조작은 조용히 무시된다", () => {
   assert.deepEqual(deliverParcel(state), []);
 
   driveToTarget(state);
-  assert.deepEqual(pushCommand(state, "up"), [], "엘리베이터에서는 명령을 못 쌓는다");
-  assert.deepEqual(runCommands(state), []);
+  unload(state);
+  assert.deepEqual(driveStep(state, "up"), [], "엘리베이터에서는 트럭이 움직이지 않는다");
 });
 
 test("어떤 실수도 별과 배송 수를 깎지 않는다", () => {
@@ -418,9 +411,9 @@ test("어떤 실수도 별과 배송 수를 깎지 않는다", () => {
 
   // 모든 단계에서 한 번씩 틀려 본다.
   state.drive.truck = { x: 0, y: 1 };
-  pushCommand(state, "left");
-  runCommands(state);
+  driveStep(state, "left"); // 격자 밖 — 막힌다
   driveToTarget(state);
+  unload(state);
   pressFloor(state, state.order.floor === 9 ? 8 : state.order.floor + 1);
   pressFloor(state, state.order.floor);
   state.corridor.focus = state.corridor.units.findIndex(unit => unit !== state.order.unit);

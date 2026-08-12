@@ -317,16 +317,31 @@ test("SRT 실제 차체 문은 정차 승하차 상태에서만 열린다", () =
   assert.equal(scene.dataset.doors, "open", "종착역에서도 실제 차체 문이 열림");
 });
 
-test("SRT 운전실은 노선의 밤 구간에서 야간 전면창을 선택한다", () => {
+test("SRT 운전실 전면창 사진은 시간대·지형 우선순위를 그대로 따른다", () => {
+  // 옆 창에 사진 판이 보이기 시작하면서 "옆은 들판, 앞은 도시"가 드러났다.
+  // 전면창이 밴드를 따라가는지 값으로 고정한다 — dataset.sky만 보면 사진이
+  // 안 바뀌어도 통과한다(실제로 그렇게 지나갔다).
   const initial = createKtxJourney(3, "srt");
   const root = renderKtxScene(fakeDocument(), initial, "cab");
   const scene = root.querySelector(".ktx-motion-scene");
+  const cases = [
+    { band: { sky: "night", land: "mountain" }, file: "cab-night.webp" },
+    { band: { sky: "day", land: "field" }, file: "cab-field.webp" },
+    { band: { sky: "day", land: "sea" }, file: "cab-sea.webp" },
+    { band: { sky: "dawn", land: "field" }, file: "cab-dawn.webp" },
+    { band: { sky: "sunset", land: "river" }, file: "cab-sunset.webp" },
+    { band: { sky: "night", land: "tunnel" }, file: "cab-tunnel.webp" }
+  ];
 
-  updateRealisticMotionScene(root,
-    { ...initial, phase: "driving", x: 2600, v: 240 },
-    { sky: "night", land: "mountain" });
-
-  assert.equal(scene.dataset.sky, "night");
+  for (const { band, file } of cases) {
+    updateRealisticMotionScene(root,
+      { ...initial, phase: "driving", x: 2600, v: 240 }, band);
+    assert.equal(scene.dataset.sky, band.sky);
+    assert.equal(
+      scene.style.getPropertyValue("--cab-base-image"),
+      `url("assets/train-realistic/${file}")`,
+      `${band.sky}·${band.land} 전면창`);
+  }
 });
 
 test("KTX는 분리 실사 모션 리그와 모션 자산 요청을 만들지 않는다", () => {

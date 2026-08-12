@@ -385,7 +385,6 @@ EN = {
 
 KO_DELIVERY = {
     "delivery-intro": "택배가 왔어요! 목표 호수로 배달해요.",
-    "delivery-go": "출발!",
     "delivery-blocked": "그쪽은 길이 아니에요. 다시 만들어 봐요.",
     "delivery-wrong-house": "여기가 아니에요. 목표 호수를 다시 봐요.",
     "delivery-arrive": "도착했어요! 이제 엘리베이터를 타요.",
@@ -403,7 +402,6 @@ KO_DELIVERY = {
 
 EN_DELIVERY = {
     "delivery-intro": "A parcel is here! Drive it to the right home.",
-    "delivery-go": "Let's go!",
     "delivery-blocked": "That way is blocked. Try another path.",
     "delivery-wrong-house": "This is not the one. Check the number again.",
     "delivery-arrive": "We are here! Now take the elevator.",

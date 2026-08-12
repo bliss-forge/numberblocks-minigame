@@ -38,9 +38,10 @@ export const REALISTIC_MOTION_ASSETS = Object.freeze({
   ])))
 });
 
-// 실사 이벤트 스프라이트 — Codex가 만든 것만 등재한다. 등재된 종류만 월드
-// 스윕으로 승격되고, 없는 종류는 기존 평면 연출을 그대로 써서 빈 화면이
-// 되지 않는다(자산 도착 순서와 배포를 분리하기 위한 장치).
+// 실사 이벤트 스프라이트 — 등재된 종류만 월드 스윕으로 승격되고, 없는 종류는
+// ktx-scene-art.mjs 의 손그림 SVG를 그대로 써서 빈 화면이 되지 않는다.
+// 2026-08-11: 사진풍 4종(cows·seagull·river·mountain) 제작은 품질 문제로 취소됐다.
+// 비어 있는 것이 정상 상태다 — 더 나은 자산이 생기면 그때 한 줄씩 등재한다.
 export const REALISTIC_EVENT_ASSETS = Object.freeze({
   // 예: cows: `${MOTION_ROOT}/event-cows.webp`
 });

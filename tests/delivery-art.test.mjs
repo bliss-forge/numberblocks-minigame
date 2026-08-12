@@ -182,9 +182,9 @@ test("친구가 기다리는 물건을 말풍선으로 말한다", () => {
   }
 });
 
-test("수령인은 호수 앞자리 번호의 실제 넘버블럭스 에셋이다", () => {
-  assert.equal(friendImageFor(502), "assets/characters/number-005.png");
-  assert.equal(friendImageFor(701), "assets/characters/number-007.png");
+test("수령인은 호수 앞자리 번호의 실제 넘버블럭스 에셋이다 — 5번 게임과 같은 그림", () => {
+  assert.equal(friendImageFor(502), "assets/characters/five.png");
+  assert.equal(friendImageFor(701), "assets/characters/seven.png");
 
   const svg = handoverSvg({ tray: PARCELS, focus: 0, wanted: PARCELS[0], unit: 502, friend: FRIENDS[0] });
   assert.ok(svg.includes(`href="${friendImageFor(502)}"`), "수령인 에셋이 없다");
@@ -206,7 +206,7 @@ test("피날레는 배달한 수만큼 친구를 세운다", () => {
 
   assert.equal((three.match(/class="dv-chorus"/g) ?? []).length, 3);
   assert.equal((five.match(/class="dv-chorus"/g) ?? []).length, 5);
-  assert.ok(five.includes("assets/characters/number-005.png"), "5번 친구가 없다");
+  assert.ok(five.includes("assets/characters/five.png"), "5번 친구가 없다");
   assert.ok(five.includes("멋진 꼬마 택배기사님, 고마워요!"), "합창 배너가 없다");
 });
 

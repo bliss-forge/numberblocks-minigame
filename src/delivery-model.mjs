@@ -1,18 +1,19 @@
-// "택배 왔어요!" 상태 머신 — 디자인 정본 락 §1·§5 의 4단계를 그대로 옮긴 순수 모델.
+// "택배 왔어요!" 상태 머신 — 목업 v3 의 다섯 단계를 그대로 옮긴 순수 모델.
 //
 // 한 건의 배송은 목표 호수 하나(예: 702)가 네 단계를 관통한다.
-//   ① 단지 운전  : 이동 명령 4칸을 쌓아 ▶ 출발 → 702호 집에 도착
-//   ② 엘리베이터 : 앞자리 7 을 눌러 7층으로
-//   ③ 호수 찾기  : 701·702·703 중 702 문 앞에서 초인종
-//   ④ 전달 순간  : 친구가 말한 물건을 골라 전달
+//   ① 단지 운전  : 방향키로 한 칸씩 몰아 702호 집에 도착 (5번 게임과 같은 문법)
+//   ② 리듬 하역  : 박자에 맞춰 상자 셋을 카트에 싣기
+//   ③ 엘리베이터 : 앞자리 7 을 눌러 7층으로
+//   ④ 호수 찾기  : 701·702·703 중 702 문 앞에서 초인종
+//   ⑤ 전달 순간  : 친구가 말한 물건을 골라 전달
 // 다섯 건을 마치면 끝난다. 어디서 틀려도 벌점은 없다 — 다시 알려 주고 다시 시킨다.
 //
 // DOM 을 모른다. 씬은 여기서 나온 이벤트 배열만 보고 그린다.
 
 import { mulberry } from "./ktx-route-data.mjs";
+import { createRhythm, passBox, rhythmDone, tickBeat } from "./delivery-rhythm.mjs";
 
 export const DELIVERY_TARGET = 5; // 배송 5건이면 하루 끝
-export const COMMAND_SLOTS = 4; // 디자인 락 §5 STEP 1 — 이동 명령 네 칸
 export const STREAK_BONUS_SLOTS = 4; // §5 STEP 4 — 연속 성공 보너스 별 네 개
 
 export const PARCELS = Object.freeze([
@@ -49,7 +50,7 @@ export const BLOCKED_CELLS = Object.freeze([
   Object.freeze({ x: 4, y: 2, kind: "tree" }),
 ]);
 
-// 난이도는 층수 범위만 바꾼다. 명령 칸 수와 지도는 그대로다.
+// 난이도는 층수 범위만 바꾼다. 지도는 그대로다.
 // 1층은 쓰지 않는다 — 목표가 1층이면 엘리베이터가 이미 도착해 있어 단계가 사라진다.
 export const LOWEST_FLOOR = 2;
 const TOP_FLOOR = Object.freeze({ easy: 5, steady: 7, challenge: 7 });
@@ -124,15 +125,13 @@ function createOrder(state) {
     parcel: parcel.id,
     friend,
     mistakes: 0,
+    missed: [],
   };
 
   state.phase = "drive";
-  state.drive = {
-    truck: { ...TRUCK_START },
-    facing: "idle",
-    queue: [],
-    path: null,
-  };
+  state.drive = { truck: { ...TRUCK_START }, facing: "idle" };
+  // 도착하면 트럭 뒤에서 상자를 내린다 — 박자에 맞춰 셋.
+  state.rhythm = createRhythm();
   state.elevator = { current: 1, target: target.floor, pressed: null };
   // 복도 문패는 목표 층의 1·2·3 호다. 목표만 빛난다.
   state.corridor = {
@@ -174,71 +173,74 @@ export function parcelById(id) {
 
 /* ── ① 단지 운전 ─────────────────────────────────────────────────── */
 
-export function pushCommand(state, direction) {
+// 안전한 길찾기(5번)와 같은 문법이다: 방향키 한 번에 한 칸씩, 바로 움직인다.
+// 명령을 쌓았다가 한 번에 실행하지 않는다 — 누른 대로 즉시 굴러가야
+// 네 살이 "내가 몰고 있다"고 느낀다.
+export function driveStep(state, direction) {
   if (state.phase !== "drive" || !STEPS[direction]) return [];
-  if (state.drive.queue.length >= COMMAND_SLOTS) {
-    return [{ type: "command-full" }];
+
+  const step = STEPS[direction];
+  const from = state.drive.truck;
+  const next = { x: from.x + step.x, y: from.y + step.y };
+
+  // 방향은 못 가는 쪽이라도 돌아본다 — 차가 바라보는 곳이 곧 다음에 갈 곳이다.
+  state.drive.facing = direction;
+
+  if (!insideGrid(next)) {
+    return [{ type: "drive-edge", direction }];
   }
-  state.drive.queue.push(direction);
-  return [{ type: "command-added", direction, slot: state.drive.queue.length }];
-}
-
-export function clearCommands(state) {
-  if (state.phase !== "drive" || state.drive.queue.length === 0) return [];
-  state.drive.queue = [];
-  return [{ type: "command-cleared" }];
-}
-
-// ▶ 출발 — 쌓아 둔 명령을 한 번에 판정한다. 씬은 path 를 받아 한 칸씩 굴린다.
-export function runCommands(state) {
-  if (state.phase !== "drive") return [];
-  if (state.drive.queue.length === 0) {
-    return [{ type: "command-empty" }];
+  const wall = blockedAt(next);
+  if (wall) {
+    return [{ type: "drive-blocked", direction, kind: wall.kind }];
   }
 
-  const path = [];
-  let at = { ...state.drive.truck };
-  let facing = state.drive.facing;
-  let blocked = null;
+  state.drive.truck = next;
 
-  for (const direction of state.drive.queue) {
-    const step = STEPS[direction];
-    const next = { x: at.x + step.x, y: at.y + step.y };
-    facing = direction;
-    if (!insideGrid(next) || blockedAt(next)) {
-      blocked = { direction, at: next };
-      break;
-    }
-    at = next;
-    path.push({ ...at, facing });
-    // 집 칸에 들어서면 거기서 멈춘다 — 지나쳐 갈 수 없다.
-    if (houseAt(state, at)) break;
-  }
-
-  state.drive.truck = at;
-  state.drive.facing = facing;
-  state.drive.path = path;
-  state.drive.queue = [];
-
-  const events = [{ type: "drive-path", path, blocked: Boolean(blocked) }];
-  if (blocked) events.push({ type: "drive-blocked", direction: blocked.direction });
-
-  // 한 칸도 못 갔으면 도착 판정을 다시 하지 않는다 — 이미 서 있던 집을 또
-  // 판정하면 실수가 부풀고 "길이 아니에요" 안내가 묻힌다.
-  const house = path.length > 0 ? houseAt(state, at) : null;
+  const house = houseAt(state, next);
   if (!house) {
-    if (!blocked) events.push({ type: "drive-nowhere" });
-    return events;
-  }
-  if (house.unit !== state.order.unit) {
-    state.order.mistakes += 1;
-    events.push({ type: "drive-miss", unit: house.unit, want: state.order.unit });
-    return events;
+    return [{ type: "drive-step", at: { ...next }, facing: direction }];
   }
 
+  if (house.unit !== state.order.unit) {
+    // 같은 집을 오갈 때마다 실수가 쌓이면 보너스가 억울하게 끊긴다.
+    // 한 배송에서 같은 집은 한 번만 센다.
+    const first = !state.order.missed.includes(house.unit);
+    if (first) {
+      state.order.missed.push(house.unit);
+      state.order.mistakes += 1;
+    }
+    return [
+      { type: "drive-step", at: { ...next }, facing: direction },
+      { type: "drive-miss", unit: house.unit, want: state.order.unit, first },
+    ];
+  }
+
+  // 도착 다음은 곧장 엘리베이터가 아니라 하역이다 — 상자를 내려야 실어 올린다.
+  state.phase = "rhythm";
+  return [
+    { type: "drive-step", at: { ...next }, facing: direction },
+    { type: "drive-arrived", unit: house.unit, floor: state.order.floor },
+  ];
+}
+
+/* ── ② 리듬 하역 ─────────────────────────────────────────────────── */
+
+// 무대가 열린 뒤 흐른 밀리초를 앱이 넣어 준다. 모델은 시계를 모른다.
+export function passRhythmBox(state, elapsedMs) {
+  if (state.phase !== "rhythm") return [];
+  return passBox(state.rhythm, elapsedMs);
+}
+
+export function tickRhythm(state, elapsedMs) {
+  if (state.phase !== "rhythm") return [];
+  return tickBeat(state.rhythm, elapsedMs);
+}
+
+// 상자를 다 내리면 카트를 밀고 승강기로 간다.
+export function boardElevator(state) {
+  if (state.phase !== "rhythm" || !rhythmDone(state.rhythm)) return [];
   state.phase = "elevator";
-  events.push({ type: "drive-arrived", unit: house.unit, floor: state.order.floor });
-  return events;
+  return [{ type: "rhythm-boarding", floor: state.order.floor }];
 }
 
 /* ── ② 엘리베이터 ────────────────────────────────────────────────── */

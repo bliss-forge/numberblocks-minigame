@@ -20,7 +20,16 @@ export async function collectCharacterVisualMetrics(
     metrics[number] = {
       area: bounds.opaquePixels / (pngWidth * pngHeight),
       width: bounds.width / pngWidth,
-      height: bounds.height / pngHeight
+      height: bounds.height / pngHeight,
+      // 캔버스 안에서 몸이 실제로 차지하는 사각형. SVG 무대가 이 값으로 잘라
+      // 붙여야 캐릭터가 바닥선 위에 정확히 선다(캔버스에는 빈 여백이 많다).
+      canvas: { width: pngWidth, height: pngHeight },
+      box: {
+        x: bounds.left,
+        y: bounds.top,
+        width: bounds.width,
+        height: bounds.height
+      }
     };
   }
 

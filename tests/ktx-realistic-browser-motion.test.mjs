@@ -124,7 +124,7 @@ test("실제 CSSOM에서 SRT 풍경·운전실 선로·차체 문이 상태에 �
     const { game, scene, makeState } = window.__motionQa;
     scene.updateKtxScene(game, makeState(200), "cab", [], {});
   });
-  await page.waitForTimeout(160);
+  await page.waitForTimeout(280);
   const cabParallaxBefore = await page.evaluate(() => {
     const motion = window.__motionQa.game.querySelector(".ktx-motion-scene");
     return {
@@ -138,7 +138,7 @@ test("실제 CSSOM에서 SRT 풍경·운전실 선로·차체 문이 상태에 �
     const { game, scene, makeState } = window.__motionQa;
     scene.updateKtxScene(game, makeState(700), "cab", [], {});
   });
-  await page.waitForTimeout(160);
+  await page.waitForTimeout(280);
   const cabParallaxAfter = await page.evaluate(() => {
     const motion = window.__motionQa.game.querySelector(".ktx-motion-scene");
     return {

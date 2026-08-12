@@ -28,8 +28,10 @@
 
 <script type="module">
 import {
-  createDelivery, deliverParcel, pressFloor, pushCommand, ringBell, runCommands,
+  createDelivery, deliverParcel, driveStep, pressFloor, ringBell,
+  boardElevator, passRhythmBox,
 } from "./src/delivery-model.mjs";
+import { BEAT_MS, RHYTHM_TARGET } from "./src/delivery-rhythm.mjs";
 import { renderDelivery } from "./src/delivery-scene.mjs";
 
 const phase = new URLSearchParams(location.search).get("phase") ?? "drive";
@@ -40,13 +42,18 @@ function driveToTarget() {
   const goal = state.order.cell;
   const dx = goal.x - state.drive.truck.x;
   const dy = goal.y - state.drive.truck.y;
-  for (let i = 0; i < Math.abs(dx); i += 1) pushCommand(state, dx > 0 ? "right" : "left");
-  for (let i = 0; i < Math.abs(dy); i += 1) pushCommand(state, dy > 0 ? "down" : "up");
-  runCommands(state);
+  for (let i = 0; i < Math.abs(dx); i += 1) driveStep(state, dx > 0 ? "right" : "left");
+  for (let i = 0; i < Math.abs(dy); i += 1) driveStep(state, dy > 0 ? "down" : "up");
+}
+
+function unload() {
+  for (let i = 1; i <= RHYTHM_TARGET; i += 1) passRhythmBox(state, i * BEAT_MS);
+  boardElevator(state);
 }
 
 function oneDelivery() {
   driveToTarget();
+  unload();
   pressFloor(state, state.order.floor);
   state.corridor.focus = state.corridor.units.indexOf(state.order.unit);
   ringBell(state);
@@ -55,17 +62,24 @@ function oneDelivery() {
 }
 
 if (phase === "drive") {
-  // 명령 두 칸을 쌓아 둔 상태 — 빈 큐보다 화면이 정직하다.
-  pushCommand(state, "right");
-  pushCommand(state, "up");
+  // 두 칸쯤 몰고 나온 상태 — 출발점보다 화면이 정직하다.
+  driveStep(state, "right");
+  driveStep(state, "right");
+} else if (phase === "rhythm") {
+  // 상자 하나를 실은 직후 — 판정 연출이 뜬 순간을 보여 준다.
+  driveToTarget();
+  passRhythmBox(state, BEAT_MS);
 } else if (phase === "elevator") {
   driveToTarget();
+  unload();
 } else if (phase === "corridor") {
   driveToTarget();
+  unload();
   pressFloor(state, state.order.floor);
   state.corridor.focus = state.corridor.units.indexOf(state.order.unit);
 } else if (phase === "handover") {
   driveToTarget();
+  unload();
   pressFloor(state, state.order.floor);
   state.corridor.focus = state.corridor.units.indexOf(state.order.unit);
   ringBell(state);

@@ -48,7 +48,7 @@ const paintKeys = [
 // 택배 왔어요! — 진행 안내 12 + 상자 이름 3. 매니페스트와의 대조는
 // tests/delivery-voice.test.mjs 가 따로 본다.
 const deliveryKeys = [
-  "delivery-intro", "delivery-go", "delivery-blocked", "delivery-wrong-house",
+  "delivery-intro", "delivery-blocked", "delivery-wrong-house",
   "delivery-arrive", "delivery-floor-wrong", "delivery-floor-ok",
   "delivery-door-wrong", "delivery-bell", "delivery-parcel-wrong",
   "delivery-parcel-ok", "delivery-finale",

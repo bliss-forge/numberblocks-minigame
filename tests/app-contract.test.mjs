@@ -443,3 +443,17 @@ test("물감 해금은 그 판에서만 유지된다 — 기기에 저장하지 
   // 판을 시작할 때 해금 목록을 넘기지 않아야 선반이 기본 다섯 칸이 된다
   assert.match(app, /createPaintPlay\(state\.difficulty, seed\)/);
 });
+
+test("KTX starts in the selected side view", () => {
+  assert.match(
+    app,
+    /state\.ktxView\s*=\s*"side";[\s\S]*?renderKtxScene\(document,\s*state\.ktx,\s*state\.ktxView\);/s
+  );
+});
+
+test("modes 6 to 9 keep playtest-guided feedback without replacing the original UI", () => {
+  assert.match(css, /\.subway-plan-step\[data-current="true"\]\s*\{[^}]*box-shadow:/s);
+  assert.match(css, /\.subway-rail \.route-pad button:active,[\s\S]*?\.dv-bell:active/s);
+  assert.match(css, /\.pp-tube\[data-hint="sparkle"\] \.pp-tube-body\s*\{[^}]*outline:/s);
+  assert.match(css, /\.dv-beat-marker\s*\{[^}]*filter:\s*drop-shadow/s);
+});

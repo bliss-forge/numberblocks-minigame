@@ -8,13 +8,18 @@
 // 기사님은 목업의 오리지널 아바타라 넘버블럭스로 바꾸지 않는다. 문이 열리고 나면
 // 그 자리에 서는 수령인만 저장소의 실제 넘버블럭스 에셋을 쓴다.
 
+import { characterAssetPath, standingCharacterSvg } from "./character-stage-art.mjs";
+
 export const ELEVATOR_RIDER = "courier"; // "truck" | "courier"
 
 // 수령인은 호수의 앞자리(=층) 번호를 가진 넘버블럭스다 — 502호에는 5번이 산다.
 // "앞자리를 읽는다"는 이 게임의 학습 훅을 캐릭터가 한 번 더 말해 준다.
+export function friendNumberFor(unit) {
+  return Math.max(1, Math.min(9, Math.floor(unit / 100)));
+}
+
 export function friendImageFor(unit) {
-  const floor = Math.max(1, Math.min(9, Math.floor(unit / 100)));
-  return `assets/characters/number-00${floor}.png`;
+  return characterAssetPath(friendNumberFor(unit));
 }
 
 const SHAFT_VIEW_BOX = "0 0 260 620";
@@ -28,7 +33,7 @@ export const HALL_BACKDROP = "#F1E6CF";
 
 /* ── 팔레트 ───────────────────────────────────────────────────────── */
 
-const P = Object.freeze({
+export const HALL_PALETTE = Object.freeze({
   wall: "#F3EDE0",
   panel: "#F9F4E7",
   panelEdge: "#DCCFAF",
@@ -92,7 +97,10 @@ const P = Object.freeze({
   mutter: "#7B8A96",
 });
 
-const SHADOWS =
+// 파일 안에서는 짧게 부른다. 리듬 하역 무대도 같은 팔레트를 쓴다.
+const P = HALL_PALETTE;
+
+export const SHADOWS =
   `<filter id="dv-soft" x="-20%" y="-20%" width="140%" height="140%">` +
   `<feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#26424E" flood-opacity="0.16"/></filter>` +
   `<filter id="dv-tiny" x="-30%" y="-30%" width="160%" height="160%">` +
@@ -112,13 +120,13 @@ const GLOW_DEFS =
 
 /* ── 공통 조각 ────────────────────────────────────────────────────── */
 
-function star(cx, cy, size = 1) {
+export function star(cx, cy, size = 1) {
   return `<path transform="translate(${cx} ${cy}) scale(${size})" ` +
     `d="M0 -13 l4 9 9 4 -9 4 -4 9 -4 -9 -9 -4 9 -4 z" fill="${P.star}"/>`;
 }
 
 // 택배 상자 + 문패 라벨. 라벨이 없으면 테이프만 있는 민 상자다.
-function parcelBox(x, y, width, height, label = null, tone = P.cartonA) {
+export function parcelBox(x, y, width, height, label = null, tone = P.cartonA) {
   const seam = height * 0.42;
   const plateWidth = width * 0.66;
   const plateHeight = height * 0.36;
@@ -139,7 +147,7 @@ function parcelBox(x, y, width, height, label = null, tone = P.cartonA) {
 }
 
 // 손수레 — 기사님이 미는 카트.
-function cart(x, y, width) {
+export function cart(x, y, width) {
   const wheel = width * 0.06;
   return `<g transform="translate(${x} ${y})">` +
     `<path d="M6 4 q-22 -16 -26 -42" stroke="${P.metal}" stroke-width="5" fill="none" stroke-linecap="round"/>` +
@@ -167,7 +175,7 @@ const COURIER_ARMS = {
     `<path d="M-28 4 q-22 -26 -40 -44" stroke="${P.vest}" stroke-width="13" fill="none" stroke-linecap="round"/>`,
 };
 
-function courier(x, y, scale = 1, pose = "idle") {
+export function courier(x, y, scale = 1, pose = "idle") {
   return `<g class="dv-courier" filter="url(#dv-tiny)">` +
     `<g transform="translate(${x} ${y}) scale(${scale})">` +
     `<rect x="-34" y="-8" width="68" height="86" rx="18" fill="${P.vest}"/>` +
@@ -209,7 +217,7 @@ function speech(rawX, y, width, height, textAt, { edge = null, tail = "left", li
 }
 
 // 소리가 퍼지는 표시 — 초인종·버튼음에 공통으로 붙는다.
-function chirp(x, y, color = P.goldWarm) {
+export function chirp(x, y, color = P.goldWarm) {
   return `<g stroke="${color}" stroke-width="3" fill="none" stroke-linecap="round" ` +
     `transform="translate(${x} ${y})">` +
     `<path d="M0 0 q6 -8 2 -16"/><path d="M14 -4 q8 -10 3 -22"/></g>`;
@@ -567,11 +575,8 @@ export function handoverSvg({ tray = [], focus = 0, wanted = null, unit = 0, fri
       `stroke="${P.gold}" stroke-width="4"/></g>` +
     `<text x="640" y="98" text-anchor="middle" font-size="30" font-weight="800" ` +
       `fill="${P.goldDeep}">${unit}</text>` +
-    // 수취인 — 저장소의 실제 넘버블럭스 에셋.
-    // 에셋은 정사각 캔버스에 여백을 두고 그려져 있어, 상자를 정사각으로 잡아야
-    // 폭에 눌리지 않고 문간을 제대로 채운다.
-    `<image class="dv-friend" href="${friendImageFor(unit)}" x="548" y="278" width="184" height="192" ` +
-      `preserveAspectRatio="xMidYMax meet"/>` +
+    // 수취인 — 5번 게임과 같은 공식 넘버블럭스 에셋을 문간 바닥에 세운다.
+    standingCharacterSvg({ number: friendNumberFor(unit), cx: 640, baseY: 466, width: 128 }) +
     // 생각 말풍선 + 시선 유도
     thoughtBubble(870, 118, item.emoji, tint) +
     `<path d="M900 214 Q930 380 700 452" fill="none" stroke="${tint}" stroke-width="3.5" ` +

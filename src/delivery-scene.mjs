@@ -8,7 +8,6 @@
 // 씬 안에서 다시 그리지 않는다 — 같은 정보를 두 번 보여 주지 않기 위한 유일한 조정.
 
 import {
-  COMMAND_SLOTS,
   DELIVERY_TARGET,
   PARCELS,
   STREAK_BONUS_SLOTS,
@@ -25,6 +24,7 @@ import {
   handoverSvg,
 } from "./delivery-building-art.mjs";
 import { FINALE_BACKDROP, finaleSvg } from "./delivery-finale-art.mjs";
+import { RHYTHM_BACKDROP, rhythmStageSvg } from "./delivery-rhythm-art.mjs";
 
 const MASCOT_IMAGE = "assets/characters/nine.png";
 
@@ -35,31 +35,38 @@ export const DELIVERY_STEPS = Object.freeze({
     name: "단지 운전",
     headline: "목표 호수로 택배차를 운전해요!",
     emoji: "📦",
-    tip: ["방향 버튼으로 길을 만들고 출발 버튼을 눌러", "택배 차가 목표 호수에 도착하도록 도와주세요!"],
+    tip: ["방향키로 택배 차를 몰아 목표 호수까지 가세요!", "Space 를 누르면 빵빵 경적을 울려요."],
+  },
+  rhythm: {
+    index: 2,
+    name: "리듬 하역",
+    headline: "박자에 맞춰 상자를 내려요!",
+    emoji: "🎵",
+    tip: ["구슬이 가운데 괄호에 들어올 때 Space 를 누르세요!", "박자를 놓쳐도 괜찮아요. 다음 박자에 다시 해요."],
   },
   elevator: {
-    index: 2,
+    index: 3,
     name: "엘리베이터",
     headline: "엘리베이터 버튼을 눌러 목표 층으로!",
     emoji: "📦",
     tip: ["엘리베이터에서 목표 층 버튼을 누르세요!", "표시기가 목표 층에 도착하면 문이 열려요."],
   },
   corridor: {
-    index: 3,
+    index: 4,
     name: "문 앞 전달",
     headline: "정확한 호수를 찾아 택배를 전달해요!",
     emoji: "",
     tip: ["라벨과 같은 호수의 문을 찾아 택배를 전달하세요!", "정확히 찾으면 초인종을 누를 수 있어요."],
   },
   handover: {
-    index: 4,
+    index: 5,
     name: "문 앞 전달 (전달 순간)",
     headline: "올바른 물건을 골라 전달해요!",
     emoji: "",
     tip: ["← → 로 상자를 고르고, Space 로 전달하세요!", "친구가 말한 물건을 맞히면 상자가 열려요."],
   },
   finale: {
-    index: 4,
+    index: 5,
     name: "배달 끝!",
     headline: "택배를 모두 전달했어요!",
     emoji: "🎉",
@@ -178,30 +185,10 @@ const DIRECTION_LABELS = { up: "위로", left: "왼쪽으로", right: "오른쪽
 // 디자인 정본 락 §10 — §5 패널의 ⬆⬅➡ 와 §6 버튼 시트의 ⬇ 를 합쳐 네 방향이다.
 const DIRECTION_ORDER = ["up", "left", "right", "down"];
 
-function drivePanel(document, state) {
+function drivePanel(document) {
   const panel = el(document, "aside", "dv-panel");
 
-  const queueCard = card(document, "이동 명령");
-  const queue = el(document, "div", "dv-queue");
-  for (let index = 0; index < COMMAND_SLOTS; index += 1) {
-    const direction = state.drive.queue[index];
-    // 채워진 칸은 눌러서 지울 수 있다 — 시안에 없는 새 버튼을 만들지 않으려고
-    // 이미 그려진 칸 자체를 조작면으로 쓴다.
-    const slot = direction
-      ? keyButton(document, "dv-slot", DIRECTION_MARKS[direction], { dvClear: "1" }, "쌓은 명령 지우기")
-      : el(document, "span", "dv-slot", "");
-    slot.dataset.filled = String(Boolean(direction));
-    queue.append(slot);
-  }
-  queueCard.append(queue);
-
-  const numbers = el(document, "div", "dv-slotnums");
-  for (let index = 1; index <= COMMAND_SLOTS; index += 1) {
-    numbers.append(el(document, "span", "dv-slotnum", String(index)));
-  }
-  queueCard.append(numbers);
-  panel.append(queueCard);
-
+  // 5번 게임과 같은 문법 — 누르면 바로 한 칸 간다. 쌓아 두는 칸도, 출발 버튼도 없다.
   const dirCard = card(document, "방향 버튼");
   const dirs = el(document, "div", "dv-dirs");
   DIRECTION_ORDER.forEach(direction => {
@@ -218,14 +205,71 @@ function drivePanel(document, state) {
   dirCard.append(dirs);
   panel.append(dirCard);
 
+  const hornCard = card(document, "경적");
+  hornCard.append(
+    keyButton(document, "dv-key dv-key-horn", "📣 빵빵!", { dvHorn: "1" }, "경적 울리기")
+  );
+  panel.append(hornCard);
+
+  return panel;
+}
+
+/* ── STEP 2 · 리듬 하역 ──────────────────────────────────────────── */
+
+function rhythmPanel(document, state) {
+  const panel = el(document, "aside", "dv-panel");
+
+  const goal = card(document, "실은 상자");
+  goal.append(
+    el(document, "span", "dv-goal-num", `${state.rhythm.loaded} / ${state.rhythm.target}`)
+  );
+  const dots = el(document, "div", "dv-dots");
+  for (let index = 0; index < state.rhythm.target; index += 1) {
+    const dot = el(document, "i", "dv-dot");
+    dot.dataset.on = String(index < state.rhythm.loaded);
+    dots.append(dot);
+  }
+  goal.append(dots);
+  panel.append(goal);
+
+  const howCard = card(document, "조작 방법");
+  const how = el(document, "div", "dv-howto");
+  const row = el(document, "div", "dv-howto-row");
+  row.append(el(document, "span", "dv-key dv-key-space", "Space"));
+  row.append(el(document, "em", "dv-howto-label", "박자에 맞춰"));
+  how.append(row);
+  howCard.append(how);
+  panel.append(howCard);
+
   panel.append(
-    keyButton(document, "dv-key dv-key-go", "▶ 출발! 🚚", { dvGo: "1" }, "출발하기")
+    keyButton(document, "dv-key dv-key-go dv-key-beat", "🎵 박자!", { dvBeat: "1" }, "박자에 맞춰 상자 내리기")
   );
 
   return panel;
 }
 
-/* ── STEP 2 · 엘리베이터 ─────────────────────────────────────────── */
+function rhythmBody(document, state) {
+  const body = el(document, "div", "dv-body");
+  body.dataset.cols = "2";
+  body.append(
+    stage(
+      document,
+      "dv-stage",
+      rhythmStageSvg({
+        unit: state.order.unit,
+        loaded: state.rhythm.loaded,
+        target: state.rhythm.target,
+        beat: state.rhythm.beat,
+        judge: state.rhythm.judge,
+      }),
+      RHYTHM_BACKDROP
+    )
+  );
+  body.append(rhythmPanel(document, state));
+  return body;
+}
+
+/* ── STEP 3 · 엘리베이터 ─────────────────────────────────────────── */
 
 const FLOOR_KEYS = [7, 8, 9, 4, 5, 6, 1, 2, 3];
 
@@ -379,7 +423,7 @@ function driveBody(document, state) {
       MAP_BACKDROP
     )
   );
-  body.append(drivePanel(document, state));
+  body.append(drivePanel(document));
   return body;
 }
 
@@ -454,6 +498,7 @@ function handoverBody(document, state) {
 
 const BODY_BY_PHASE = {
   drive: driveBody,
+  rhythm: rhythmBody,
   elevator: elevatorBody,
   corridor: corridorBody,
   handover: handoverBody,

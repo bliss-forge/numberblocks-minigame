@@ -278,3 +278,30 @@ test("실사 모드 대기줄과 워커는 열차 차체와 겹치지 않는 전
   assert.match(css,
     /data-motion-realistic="ready"[^\{]*\.ktx-walker-host,[^\{]*data-motion-realistic="ready"[^\{]*\.ktx-queue\s*\{[^}]*bottom:\s*22%/s);
 });
+
+test("운전실 옆 창은 흐르는 풍경·유리막·시간대를 모두 갖춘다", () => {
+  // 옆 창은 전면창 사다리꼴 바깥이라 계층이 없으면 장면 배경색이 그대로
+  // 비친다(하늘색 삼각 쐐기). 아래 셋 중 하나라도 빠지면 그 결함이 돌아온다.
+  assert.match(css,
+    /data-view="cab"\][^\{]*\.ktx-motion-plate\s*\{[^}]*--cab-glass-blur/s,
+    "판이 운전실 뷰에서 보이고 유리 값으로 합성된다");
+  assert.match(css, /\.ktx-motion-glass\s*\{/, "유리막 계층");
+  assert.match(css,
+    /data-view="cab"\][^\{]*\.ktx-motion-glass\s*\{[^}]*display:\s*block/s);
+  for (const sky of ["dawn", "sunset", "night"]) {
+    assert.match(css,
+      new RegExp(`data-view="cab"\\][^\\{]*data-sky="${sky}"\\][^\\{]*\\{[^}]*--cab-glass-bright`, "s"),
+      `${sky} 유리 밝기 — 없으면 옆 창만 대낮으로 빛난다`);
+  }
+  for (const band of ["cruise", "fast", "very-fast"]) {
+    assert.match(css,
+      new RegExp(`data-view="cab"\\][^\\{]*data-speed-band="${band}"\\][^\\{]*\\{[^}]*--cab-glass-blur`, "s"),
+      `${band} 흐름 블러`);
+  }
+});
+
+test("실사 준비 상태에서 레거시 만화 속도선은 화면에서 빠진다", () => {
+  // 실사 사진 위에 흰 파선 두 줄이 남아 화면 좌우 끝 얼룩으로 보였다.
+  assert.match(css,
+    /data-realistic="ready"[^\{]*\.ktx-speedlines\s*\{[^}]*display:\s*none/s);
+});

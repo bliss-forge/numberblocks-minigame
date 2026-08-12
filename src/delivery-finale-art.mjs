@@ -6,6 +6,8 @@
 // 세는 놀이가 마지막 화면에서 한 번 더 나온다. 동 이름은 붙이지 않는다:
 // 이 게임은 처음부터 끝까지 "동"이 아니라 "호수"로만 말해 왔다.
 
+import { standingCharacterSvg } from "./character-stage-art.mjs";
+
 export const FINALE_VIEW_BOX = "0 0 1280 560";
 export const FINALE_BACKDROP = "#FFD9A8";
 
@@ -107,15 +109,17 @@ function chorus(count) {
   const spread = 132;
   const startX = 640 - ((shown - 1) * spread) / 2;
 
-  // 에셋은 정사각 캔버스에 여백을 두고 그려져 있다. 상자를 정사각으로 잡아야
-  // 번호가 클수록 키가 커지는 것이 그대로 보인다.
-  return Array.from({ length: shown }, (unused, index) => {
+    return Array.from({ length: shown }, (unused, index) => {
     const number = index + 1;
-    const side = 116 + number * 20;
-    const x = startX + index * spread - side / 2;
-    return `<image class="dv-chorus" href="assets/characters/number-00${number}.png" ` +
-      `x="${x.toFixed(1)}" y="${500 - side}" width="${side}" ` +
-      `height="${side}" preserveAspectRatio="xMidYMax meet"/>`;
+    const x = startX + index * spread;
+    // 폭을 조금씩 키운다 — 번호가 커질수록 몸집도 커 보이게.
+    return standingCharacterSvg({
+      number,
+      cx: x,
+      baseY: 500,
+      width: 62 + number * 7,
+      className: "dv-chorus",
+    });
   }).join("");
 }
 

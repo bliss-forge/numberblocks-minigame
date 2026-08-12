@@ -13,6 +13,7 @@
 
 import { BLOCKED_CELLS, GRID_COLUMNS, GRID_ROWS } from "./delivery-model.mjs";
 import { truckSprite, truckSpriteHeight } from "./delivery-truck-art.mjs";
+import { standingCharacterSvg } from "./character-stage-art.mjs";
 
 export const MAP_VIEW_BOX = "0 0 1140 560";
 // 그림이 무대보다 납작할 때 남는 위아래를 채울 색 — 잔디와 같은 톤.
@@ -238,9 +239,7 @@ function puppy(x, y) {
 // 건널목 옆에서 손 흔드는 미니 친구 — 넘버블럭스 2번 에셋을 그대로 세운다.
 // 인도 위에 세운다. 횡단보도 위에 두면 "차 앞에 서 있는 아이"가 되어 버린다.
 function miniFriend(x, y) {
-  // 에셋은 정사각 캔버스에 여백을 두고 그려져 있어 상자도 정사각으로 잡는다.
-  return `<image href="assets/characters/number-002.png" x="${x - 44}" y="${y - 88}" ` +
-    `width="88" height="88" preserveAspectRatio="xMidYMax meet"/>`;
+  return standingCharacterSvg({ number: 2, cx: x, baseY: y, width: 46, className: "dv-mini-friend" });
 }
 
 function pond(cx, cy) {
