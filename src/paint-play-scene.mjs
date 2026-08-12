@@ -146,6 +146,33 @@ const SUBJECT_ART = {
     <path d="M100 66 C102 50 100 38 92 28" stroke="#8fd0f8" stroke-width="6" fill="none" stroke-linecap="round"/>
     <circle cx="94" cy="116" r="8" fill="#31445b"/>
     <path d="M106 142 C118 152 138 152 150 142" fill="none" stroke="#31445b" stroke-width="6" stroke-linecap="round"/>`,
+  crow: `
+    <ellipse cx="146" cy="146" rx="76" ry="52" ${FILL}/>
+    <circle cx="90" cy="98" r="38" ${FILL}/>
+    <path d="M196 132 C226 138 244 158 248 182 C232 176 214 168 200 162z" ${FILL}/>
+    <path d="M120 156 C150 142 184 142 208 152 C186 172 150 176 124 168z" ${FILL}/>
+    <path d="M54 92 L18 100 L54 112z" fill="#ffb15c" stroke="#e8763a" stroke-width="4"/>
+    <circle cx="82" cy="88" r="9" fill="#f6f8fc" stroke="${DETAIL}" stroke-width="3"/>
+    <circle cx="82" cy="88" r="4" fill="#31445b"/>
+    <path d="M112 192 L104 222 M128 194 L124 224" stroke="#ffb15c" stroke-width="7" stroke-linecap="round"/>
+    <path d="M96 222 L118 222 M116 224 L136 224" stroke="#ffb15c" stroke-width="6" stroke-linecap="round"/>`,
+  // 하양은 흰 도화지에서 안 보인다 — SVG 안에 하늘·눈밭을 고정색으로 깔아
+  // 칠해진 면이 대비로 드러나게 한다(다른 그림과 달리 배경이 있는 이유).
+  snowman: `
+    <rect x="8" y="10" width="264" height="220" rx="16" fill="#bfe2f7"/>
+    <path d="M8 196 C70 178 132 186 190 198 C222 204 252 206 272 202 L272 230 L8 230z" fill="#e8f4fb"/>
+    <circle cx="140" cy="170" r="54" ${FILL}/>
+    <circle cx="140" cy="104" r="38" ${FILL}/>
+    <circle cx="140" cy="52" r="27" ${FILL}/>
+    <path d="M113 40 L167 40 L167 30 L113 30z" fill="#3a4152"/>
+    <path d="M120 30 L160 30 L160 12 L120 12z" fill="#3a4152"/>
+    <circle cx="131" cy="48" r="5" fill="#31445b"/>
+    <circle cx="151" cy="48" r="5" fill="#31445b"/>
+    <path d="M140 56 L162 62 L140 68z" fill="#ff8a3d" stroke="#e8763a" stroke-width="3"/>
+    <circle cx="140" cy="96" r="6" fill="#31445b"/>
+    <circle cx="140" cy="118" r="6" fill="#31445b"/>
+    <path d="M102 104 L58 88" stroke="#8a6a48" stroke-width="7" stroke-linecap="round"/>
+    <path d="M178 104 L222 88" stroke="#8a6a48" stroke-width="7" stroke-linecap="round"/>`,
   tangerine: `
     <circle cx="140" cy="146" r="74" ${FILL}/>
     <path d="M140 66 C138 52 130 44 118 40" stroke="#8a6a48" stroke-width="7" fill="none" stroke-linecap="round"/>

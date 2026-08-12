@@ -431,3 +431,15 @@ test("물감 ⎵ 실행은 Tab 으로 옮긴 DOM 포커스를 먼저 따른다",
   assert.ok(domFocus >= 0, "DOM 포커스를 보지 않는다");
   assert.ok(domFocus < gameFocus, "DOM 포커스 분기가 게임 포커스보다 앞에 와야 한다");
 });
+
+// 판마다 다섯 칸에서 시작한다(2026-08-11 사용자 지시) — 해금을 localStorage 로
+// 영구 저장하던 코드를 걷어냈다. 되살아나면 다음 판이 열 칸에서 시작해
+// "처음부터 1~0번이 다 있다"는 원래 증상이 그대로 재발한다.
+test("물감 해금은 그 판에서만 유지된다 — 기기에 저장하지 않는다", () => {
+  assert.doesNotMatch(app, /numberblocks-paint-unlocked/,
+    "해금 localStorage 키가 되살아났다");
+  assert.doesNotMatch(app, /readPaintUnlocks|savePaintUnlock/,
+    "해금 영구 저장 함수가 되살아났다");
+  // 판을 시작할 때 해금 목록을 넘기지 않아야 선반이 기본 다섯 칸이 된다
+  assert.match(app, /createPaintPlay\(state\.difficulty, seed\)/);
+});

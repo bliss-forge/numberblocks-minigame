@@ -25,7 +25,8 @@ const paintKeys = [
   ...[
     "firetruck", "chick", "bus", "carrot", "car", "frog", "tractor",
     "grape", "heli", "blossom", "boat", "bear", "rocket",
-    "strawberry", "banana", "whale", "tangerine", "plane", "submarine",
+    "strawberry", "banana", "whale", "crow", "snowman",
+    "tangerine", "plane", "submarine",
     "pig", "peach", "caterpillar", "butterfly", "acorn", "pine", "eggplant",
     "sandcastle", "camel", "dumptruck", "elephant", "cactus"
   ].map(subject => `paint-order-${subject}`),
