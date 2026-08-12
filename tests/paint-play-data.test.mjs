@@ -171,6 +171,53 @@ test("그림 주제는 목표색·스테이지가 팔레트·레시피와 정합
   }
 });
 
+// 사용자 요구(2026-08-11): 한 판에 그림 열 개.
+test("모든 난이도가 한 판에 열 라운드다", () => {
+  for (const [difficulty, plan] of Object.entries(STAGE_PLANS)) {
+    assert.equal(plan.length, 10, `${difficulty} 라운드 수`);
+  }
+});
+
+// 선반은 기본 다섯에서 시작해 숫자키가 덮는 열 칸까지만 자란다. 계획이
+// 해금 대상(2재료 = 스테이지 2·3·4 목표)을 여섯 개 이상 내면 키 없는
+// 튜브가 생긴다 — 계획을 손볼 때마다 여기서 걸리게 한다.
+test("한 판의 해금 대상은 다섯을 넘지 않는다 — 선반이 열 칸을 넘지 않게", () => {
+  const twoPart = new Set(
+    Object.entries(PAINT_RECIPES)
+      .filter(([, parts]) => parts.length === 2)
+      .map(([colorId]) => colorId)
+  );
+  for (const [difficulty, plan] of Object.entries(STAGE_PLANS)) {
+    // 스테이지 2·3 은 항상 2재료, 스테이지 4(역추론)도 2·3 색 풀에서 뽑는다
+    const unlockable = plan.filter(stage => [2, 3, 4].includes(stage)).length;
+    assert.ok(
+      unlockable <= KEY_SLOTS - PAINT_TUBES.length,
+      `${difficulty} 해금 대상 ${unlockable}개 — 최대 ${KEY_SLOTS - PAINT_TUBES.length}`
+    );
+  }
+  // 스테이지 2·3 목표색이 실제로 전부 2재료(=해금 대상)인지 확인
+  for (const subject of PAINT_SUBJECTS) {
+    if (subject.stage === 2 || subject.stage === 3) {
+      assert.ok(twoPart.has(subject.color), `${subject.id} 는 2재료 색`);
+    }
+  }
+});
+
+// 원색 라운드가 다섯 색 전부를 쓴다 — 판 시작의 다섯 튜브를 다 써 보게 한다.
+test("원색 스테이지는 기본 튜브 다섯 색을 모두 출제한다", () => {
+  const primaries = new Set(
+    PAINT_SUBJECTS.filter(subject => subject.stage === 1).map(subject => subject.color)
+  );
+  assert.deepEqual(
+    [...primaries].sort(),
+    PAINT_TUBES.map(tube => tube.id).sort(),
+    "원색 출제 색 = 기본 튜브"
+  );
+  for (const tube of PAINT_TUBES) {
+    assert.deepEqual(PAINT_RECIPES[tube.id], [tube.id], `${tube.id} 1재료 레시피`);
+  }
+});
+
 // 사용자 요구(2026-08-11): 쉬움 2가지 · 중간 3가지 · 어려움 4가지.
 test("난이도 = 섞는 색 개수 — 쉬움 2 · 중간 3 · 어려움 4", () => {
   const parts = plan => plan.map(stage => STAGE_PARTS[stage] ?? 2);

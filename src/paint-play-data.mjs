@@ -78,6 +78,10 @@ export const PAINT_RECIPES = Object.freeze({
   red: Object.freeze(["red"]),
   yellow: Object.freeze(["yellow"]),
   blue: Object.freeze(["blue"]),
+  // 검정·하양도 원색 라운드로 낸다 — 판 시작의 다섯 튜브(숫자키 1~5)를
+  // 먼저 다 써 보게 하려는 배치다(2026-08-11 사용자 지시).
+  black: Object.freeze(["black"]),
+  white: Object.freeze(["white"]),
   orange: Object.freeze(["red", "yellow"]),
   green: Object.freeze(["yellow", "blue"]),
   purple: Object.freeze(["red", "blue"]),
@@ -207,6 +211,8 @@ export const PAINT_SUBJECTS = Object.freeze([
   Object.freeze({ id: "banana", ko: "바나나", color: "yellow", vehicle: false, stage: 1 }),
   Object.freeze({ id: "bus", ko: "버스", color: "blue", vehicle: true, stage: 1 }),
   Object.freeze({ id: "whale", ko: "고래", color: "blue", vehicle: false, stage: 1 }),
+  Object.freeze({ id: "crow", ko: "까마귀", color: "black", vehicle: false, stage: 1 }),
+  Object.freeze({ id: "snowman", ko: "눈사람", color: "white", vehicle: false, stage: 1 }),
   Object.freeze({ id: "carrot", ko: "당근", color: "orange", vehicle: false, stage: 2 }),
   Object.freeze({ id: "car", ko: "자동차", color: "orange", vehicle: true, stage: 2 }),
   Object.freeze({ id: "tangerine", ko: "귤", color: "orange", vehicle: false, stage: 2 }),
@@ -242,20 +248,28 @@ export const STAGE_PARTS = Object.freeze({
   1: 1, 2: 2, 3: 2, 4: 2, 5: 3, 6: 4
 });
 
-// 난이도별 라운드 스테이지 계획 — 사용자 정의(2026-08-11):
+// 난이도별 라운드 계획 — 한 판에 그림 열 개(2026-08-11 사용자 지시).
 // 쉬움은 두 색까지, 중간은 세 색까지, 어려움은 네 색까지 섞는다.
 // 4 = 역추론(힌트 없이 시작 — 2·3스테이지 색에서 출제, 2회 실패 시 힌트 복귀).
-// 쉬움의 첫 라운드는 원색 하나로 남긴다 — 실패 위험 없이 조작을 배우는 자리다.
-// 어려움도 2색으로 시작한다: 해금이 하나도 없는 첫 판에서 4색 라운드를 만나기
-// 전에 "내 물감"을 한 개라도 얻게 하려는 배치다.
+//
+// 계획을 짤 때 지키는 불변식 둘:
+// ① 한 판의 색은 서로 달라야 한다(buildRounds 가 전량 배제) → 각 스테이지
+//    등장 횟수가 그 스테이지 색 풀(1:5 · 2:3 · 3:4 · 5:6 · 6:4)을 넘지 않는다.
+// ② 한 판에 해금될 수 있는 색(2재료 = 스테이지 2·3·4 목표)이 다섯을 넘지
+//    않는다. 선반은 기본 5칸에서 시작해 최대 열 칸(숫자키 1~9,0)까지만 자란다.
+// 쉬움이 원색을 다섯 번 내는 건 판 시작의 다섯 튜브를 먼저 다 써 보게 하려는
+// 배치이고, 그 덕에 쉬움도 해금 대상이 정확히 다섯(2×3 + 3×2)으로 맞는다.
 export const STAGE_PLANS = Object.freeze({
-  easy: Object.freeze([1, 2, 2, 3, 3]),
-  steady: Object.freeze([2, 3, 5, 2, 5, 5]),
-  challenge: Object.freeze([2, 5, 6, 3, 5, 4, 6])
+  easy: Object.freeze([1, 1, 1, 2, 1, 2, 1, 2, 3, 3]),
+  steady: Object.freeze([2, 3, 5, 2, 5, 3, 5, 5, 3, 5]),
+  challenge: Object.freeze([2, 5, 6, 3, 5, 6, 4, 6, 5, 6])
 });
 
 // 무지개 피날레 조건 — 갤러리에 서로 다른 색이 이만큼 모이면 일곱이의 대단원.
-export const RAINBOW_COUNT = 7;
+// 한 판이 열 라운드이고 색이 서로 다르므로(buildRounds 전량 배제), 갤러리
+// 카운터는 곧 진행도다: 🌈 3/10색. 예전 7은 라운드가 5~7이던 시절의 값이라
+// 열 라운드에서는 중반에 이미 채워져 남은 세 판이 무의미했다(2026-08-11).
+export const RAINBOW_COUNT = 10;
 
 // 받침 유무에 따른 조사 — pair: [받침 있을 때, 없을 때].
 // 예: josa("당근", "을", "를") → "을" · josa("보라", "을", "를") → "를"

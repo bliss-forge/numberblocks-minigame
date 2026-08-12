@@ -1760,29 +1760,10 @@ function deleteDigit() {
 
 // ── 알록달록 물감 놀이 ────────────────────────────────────────────────────
 
-// 해금한 "내 물감" — 완성해 본 혼합색은 기기에 남아 다음 게임부터 선반에 나온다.
-const PAINT_UNLOCK_KEY = "numberblocks-paint-unlocked";
-
-function readPaintUnlocks() {
-  try {
-    const list = JSON.parse(localStorage.getItem(PAINT_UNLOCK_KEY) ?? "[]");
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return [];
-  }
-}
-
-function savePaintUnlock(colorId) {
-  try {
-    const list = readPaintUnlocks();
-    if (!list.includes(colorId)) {
-      list.push(colorId);
-      localStorage.setItem(PAINT_UNLOCK_KEY, JSON.stringify(list));
-    }
-  } catch {
-    // 저장 실패는 이번 판 해금에만 영향 없음 — 다음 판에 다시 해금하면 된다
-  }
-}
+// 해금한 "내 물감"은 그 판 안에서만 늘어난다(2026-08-11 사용자 지시).
+// 예전엔 localStorage 에 영구 저장해서, 한 번 다 모으면 다음 판이 열 칸에서
+// 시작했다 — "처음부터 1~0번이 다 있다"는 게 그 증상이었다. 판마다 다섯
+// 칸에서 시작해 그 판에서 만든 색만 붙는 게 이 게임의 진행감이다.
 
 // 혼합 문장("A와 B를 섞으면 C!")은 CANONICAL_MIX의 재료를 말한다.
 // 병 내용이 그 재료와 일치할 때만 혼합 문장을 틀고, 다른 조합으로 같은 색이
@@ -1870,7 +1851,8 @@ function startPaintPlay() {
   state.problem = null;
   state.buffer = "";
   const seed = Math.floor(Math.random() * 0x100000000);
-  state.paint = createPaintPlay(state.difficulty, seed, readPaintUnlocks());
+  // 해금 없이 시작한다 — 선반은 기본 다섯 튜브(숫자키 1~5)뿐이다.
+  state.paint = createPaintPlay(state.difficulty, seed);
   state.paintBusy = false;
   state.paintScene = renderPaintPlay(document, state.paint);
   dom.stage.setAttribute("aria-live", "off");
@@ -1941,9 +1923,8 @@ function handlePaintEvents(events) {
         }, PAINT_HOLD_MS - 500);
       }
     } else if (event.type === "unlocked") {
-      // 새 물감 해금 — 저장하고 알린다. 낭독은 혼합 문장이 끝난 뒤에 잇고,
-      // 피날레와 겹치는 판이면 토스트·효과음만(피날레 낭독이 우선).
-      savePaintUnlock(event.color);
+      // 새 물감 해금 — 이 판의 선반에 바로 붙는다. 낭독은 혼합 문장이 끝난
+      // 뒤에 잇고, 피날레와 겹치는 판이면 토스트·효과음만(피날레 낭독 우선).
       audio.playSfx("jingle");
       const name = PAINT_COLORS[event.color].ko;
       showHint(

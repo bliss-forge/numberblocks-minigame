@@ -8512,12 +8512,16 @@ body[data-mode="paint"] .stage-lights {
   padding-top: 2px;
 }
 
-.pp-paper:nth-child(2) { animation-delay: .12s; }
-.pp-paper:nth-child(3) { animation-delay: .24s; }
-.pp-paper:nth-child(4) { animation-delay: .36s; }
-.pp-paper:nth-child(5) { animation-delay: .48s; }
-.pp-paper:nth-child(6) { animation-delay: .6s; }
-.pp-paper:nth-child(7) { animation-delay: .72s; }
+/* 한 판이 열 그림이라 열 장까지 차례로 붙는다(2026-08-11) */
+.pp-paper:nth-child(2) { animation-delay: .1s; }
+.pp-paper:nth-child(3) { animation-delay: .2s; }
+.pp-paper:nth-child(4) { animation-delay: .3s; }
+.pp-paper:nth-child(5) { animation-delay: .4s; }
+.pp-paper:nth-child(6) { animation-delay: .5s; }
+.pp-paper:nth-child(7) { animation-delay: .6s; }
+.pp-paper:nth-child(8) { animation-delay: .7s; }
+.pp-paper:nth-child(9) { animation-delay: .8s; }
+.pp-paper:nth-child(10) { animation-delay: .9s; }
 
 .pp-finale-note { font-size: clamp(16px, 2vw, 22px); font-weight: 900; color: #7d8ea1; margin: 0; }
 

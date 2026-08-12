@@ -21,6 +21,7 @@ import {
   PAINT_COLORS,
   PAINT_RECIPES,
   PAINT_TUBES,
+  RAINBOW_COUNT,
   STAGE_PLANS,
   UNLOCKABLE,
   slotKeyDigit
@@ -302,15 +303,32 @@ test("전 라운드 완주 — finale 이벤트와 상태", () => {
   assert.equal(finale.rainbow, distinct >= 7);
 });
 
-test("도전 완주 시 서로 다른 색 7개면 무지개가 뜰 수 있다", () => {
-  // 시드를 훑어 7색 완주가 실제로 가능함을 보인다(가능성 계약)
-  let found = false;
-  for (let seed = 0; seed < 60 && !found; seed += 1) {
-    const state = createPaintPlay("challenge", seed);
-    const distinct = new Set(state.rounds.map(round => round.colorId));
-    if (distinct.size >= 7) found = true;
+// 열 라운드가 모두 다른 색이므로 완주하면 무지개다 — 카운터(🌈 n/10색)가
+// 곧 진행도가 된다. 중간에 그만두면 갤러리가 덜 차고 무지개도 안 뜬다.
+test("열 색을 다 칠하면 무지개, 덜 칠하면 안 뜬다", () => {
+  assert.equal(RAINBOW_COUNT, 10, "카운터 목표 = 한 판 라운드 수");
+  for (const difficulty of Object.keys(STAGE_PLANS)) {
+    for (const seed of [0, 7, 42]) {
+      const state = createPaintPlay(difficulty, seed);
+      while (!state.finale) {
+        const round = currentRound(state);
+        for (const part of recipeFor(round.colorId)) squeezeTube(state, part);
+        paintCanvas(state);
+      }
+      const distinct = new Set(state.gallery.map(entry => entry.colorId)).size;
+      assert.equal(distinct, 10, `${difficulty} seed ${seed} 열 색 전부 다름`);
+      assert.equal(state.rainbow, true, `${difficulty} seed ${seed} 무지개`);
+    }
   }
-  assert.ok(found, "7색 라운드 구성이 존재");
+  // 아홉 칠하고 멈춘 상태에서는 무지개가 아니다
+  const partial = createPaintPlay("easy", 1);
+  for (let index = 0; index < 9; index += 1) {
+    const round = currentRound(partial);
+    for (const part of recipeFor(round.colorId)) squeezeTube(partial, part);
+    paintCanvas(partial);
+  }
+  assert.equal(partial.finale, false, "아직 완주 아님");
+  assert.equal(partial.rainbow, false, "아홉 색으론 무지개 아님");
 });
 
 test("포커스 순환 — 선반 튜브 + 헹구기를 양방향으로 감싸고 해금만큼 늘어난다", () => {
@@ -394,6 +412,44 @@ test("tubeForDigit — 숫자키가 가리키는 칸을 앱과 같은 함수로 
   const full = createPaintPlay("easy", 1, [...UNLOCKABLE]);
   assert.equal(tubeForDigit(full, "0").tube.id, "sky");
   assert.equal(tubeForDigit(full, "0").index, 9);
+});
+
+// 사용자 요구(2026-08-11): 판마다 다섯 칸에서 시작해, 그 판에서 만든 색만
+// 붙는다. 예전엔 localStorage 로 영구 저장해 다음 판이 열 칸에서 시작했다.
+test("판 시작 선반은 기본 다섯 칸이고, 그 판에서 만든 색만 붙는다", () => {
+  const fresh = createPaintPlay("easy", 3);
+  assert.deepEqual(fresh.myTubes, [], "시작은 해금 0");
+  assert.deepEqual(
+    shelfTubes(fresh).map(tube => tube.id),
+    PAINT_TUBES.map(tube => tube.id),
+    "선반은 기본 다섯 튜브뿐"
+  );
+  assert.deepEqual(
+    ["1", "2", "3", "4", "5"].map(digit => tubeForDigit(fresh, digit)?.tube.id),
+    ["red", "yellow", "blue", "black", "white"]
+  );
+  for (const digit of ["6", "7", "8", "9", "0"]) {
+    assert.equal(tubeForDigit(fresh, digit), null, `${digit}번은 아직 빈 칸`);
+  }
+
+  // 실제로 한 판을 완주하면서 선반이 자라는지 — 그리고 열 칸을 안 넘는지
+  for (const difficulty of Object.keys(STAGE_PLANS)) {
+    for (let seed = 0; seed < 120; seed += 1) {
+      const state = createPaintPlay(difficulty, seed);
+      assert.equal(state.rounds.length, 10, `${difficulty} 열 라운드`);
+      let peak = shelfTubes(state).length;
+      while (!state.finale) {
+        const round = currentRound(state);
+        for (const part of recipeFor(round.colorId)) squeezeTube(state, part);
+        paintCanvas(state);
+        peak = Math.max(peak, shelfTubes(state).length);
+      }
+      assert.ok(peak <= 10,
+        `${difficulty} seed ${seed} 선반이 ${peak}칸 — 숫자키 열 개를 넘었다`);
+      assert.ok(state.myTubes.length >= 1,
+        `${difficulty} seed ${seed} 한 판에 최소 하나는 해금돼야 진행감이 있다`);
+    }
+  }
 });
 
 test("숫자키 슬롯 — 기본 5 + 해금이 1..9,0 을 순서대로 받고 11번째는 없다", () => {
