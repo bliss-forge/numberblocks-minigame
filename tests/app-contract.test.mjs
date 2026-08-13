@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const css = await readFile(new URL("../styles.css", import.meta.url), "utf8");
@@ -87,9 +88,20 @@ test("홈 카드 번호는 같은 번호의 블럭 친구를 사용한다", () =
       card,
       new RegExp(`<span class="card-number">${key}<\\/span>`)
     );
+    // src(원본)와 alt는 계약이고, 그 뒤 속성은 자유다 — 홈은 480px 축소본을
+    // srcset으로 받아 첫 화면을 가볍게 한다. 축소본이 사라지면 홈이 다시
+    // 4.7MB를 당기므로 파일 존재까지 함께 고정한다.
     assert.match(
       card,
-      new RegExp(`<img src="assets/characters/${asset}\\.png" alt="">`)
+      new RegExp(`<img src="assets/characters/${asset}\\.png" alt=""[^>]*>`)
+    );
+    assert.match(
+      card,
+      new RegExp(`srcset="assets/characters/thumb/${asset}\\.webp \\d+w"`)
+    );
+    assert.ok(
+      existsSync(new URL(`../assets/characters/thumb/${asset}.webp`, import.meta.url)),
+      `${asset}.webp 축소본이 저장소에 있어야 한다`
     );
   }
 });

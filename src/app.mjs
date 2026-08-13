@@ -225,10 +225,14 @@ const state = {
   recentProblemKeys: []
 };
 
+// 홈에서 보이는 것은 480px 축소본이다(원본 10장 4.7MB → 160KB). 원본은 홈에서
+// 한 픽셀도 쓰이지 않으므로 여기서 당기지 않는다 — 유휴 시간에 뒤에서 데우는
+// 방식도 실측해 보니 requestIdleCallback이 로드 직후 바로 발사돼 결국 첫 화면과
+// 대역폭을 다퉜다. 원본은 게임에 들어가 character()가 붙일 때 받는다.
 function preloadCharacters() {
   Object.values(NUMBERBLOCKS).slice(0, 10).forEach(({ asset }) => {
     const image = new Image();
-    image.src = `assets/characters/${asset}`;
+    image.src = `assets/characters/thumb/${asset.replace(/\.png$/, ".webp")}`;
   });
 }
 
