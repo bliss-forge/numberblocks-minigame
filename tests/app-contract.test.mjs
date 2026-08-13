@@ -457,3 +457,19 @@ test("modes 6 to 9 keep playtest-guided feedback without replacing the original 
   assert.match(css, /\.pp-tube\[data-hint="sparkle"\] \.pp-tube-body\s*\{[^}]*outline:/s);
   assert.match(css, /\.dv-beat-marker\s*\{[^}]*filter:\s*drop-shadow/s);
 });
+
+// 숫자키가 물감 놀이의 주 조작인데(2026-08-11 사용자 지시) 화면 어디에도
+// 설명이 없으면 아이도 부모도 새 규칙을 알 방법이 없다. 시작 안내가
+// 화살표만 말하던 상태로 되돌아가지 않게 못 박는다.
+test("물감 시작 안내는 숫자키와 번호가 늘어나는 규칙을 알려 준다", () => {
+  const start = app.slice(
+    app.indexOf("function startPaintPlay("),
+    app.indexOf("function handlePaintEvents(")
+  );
+  assert.ok(start.length > 0, "startPaintPlay 를 찾지 못했다");
+  const hint = start.match(/showHint\("([^"]+)"\)/);
+  assert.ok(hint, "시작 안내 토스트가 없다");
+  assert.match(hint[1], /숫자/, "숫자키 안내가 빠졌다");
+  assert.match(hint[1], /1~5/, "시작 시 다섯 칸이라는 안내가 빠졌다");
+  assert.match(hint[1], /늘어나/, "번호가 늘어난다는 안내가 빠졌다");
+});

@@ -1863,7 +1863,10 @@ function startPaintPlay() {
   dom.hint.textContent = "";
   setPhase("playing");
   audio.playSfx("win");
-  showHint("물감을 고르면 저절로 섞여요! ← → 로 고르고 ⎵");
+  // 숫자키가 이 게임의 주 조작이다(2026-08-11 사용자 지시). 배지에 눌러야 할
+  // 숫자가 찍혀 있지만, 판이 진행되며 번호가 늘어나는 규칙은 안내가 있어야
+  // 아이도 부모도 안다. ←/→ + ⎵ 는 그대로 살아 있고 배지가 스스로 설명한다.
+  showHint("숫자 1~5로 물감을 골라요! 새 색을 만들면 번호가 늘어나요");
   audio.cancel();
   const introRound = state.round;
   speakPaint("paint-intro");
