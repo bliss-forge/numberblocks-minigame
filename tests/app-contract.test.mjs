@@ -432,6 +432,18 @@ test("물감 ⎵ 실행은 Tab 으로 옮긴 DOM 포커스를 먼저 따른다",
   assert.ok(domFocus < gameFocus, "DOM 포커스 분기가 게임 포커스보다 앞에 와야 한다");
 });
 
+// 판마다 다섯 칸에서 시작한다(2026-08-11 사용자 지시) — 해금을 localStorage 로
+// 영구 저장하던 코드를 걷어냈다. 되살아나면 다음 판이 열 칸에서 시작해
+// "처음부터 1~0번이 다 있다"는 원래 증상이 그대로 재발한다.
+test("물감 해금은 그 판에서만 유지된다 — 기기에 저장하지 않는다", () => {
+  assert.doesNotMatch(app, /numberblocks-paint-unlocked/,
+    "해금 localStorage 키가 되살아났다");
+  assert.doesNotMatch(app, /readPaintUnlocks|savePaintUnlock/,
+    "해금 영구 저장 함수가 되살아났다");
+  // 판을 시작할 때 해금 목록을 넘기지 않아야 선반이 기본 다섯 칸이 된다
+  assert.match(app, /createPaintPlay\(state\.difficulty, seed\)/);
+});
+
 test("KTX starts in the selected side view", () => {
   assert.match(
     app,
@@ -444,4 +456,20 @@ test("modes 6 to 9 keep playtest-guided feedback without replacing the original 
   assert.match(css, /\.subway-rail \.route-pad button:active,[\s\S]*?\.dv-bell:active/s);
   assert.match(css, /\.pp-tube\[data-hint="sparkle"\] \.pp-tube-body\s*\{[^}]*outline:/s);
   assert.match(css, /\.dv-beat-marker\s*\{[^}]*filter:\s*drop-shadow/s);
+});
+
+// 숫자키가 물감 놀이의 주 조작인데(2026-08-11 사용자 지시) 화면 어디에도
+// 설명이 없으면 아이도 부모도 새 규칙을 알 방법이 없다. 시작 안내가
+// 화살표만 말하던 상태로 되돌아가지 않게 못 박는다.
+test("물감 시작 안내는 숫자키와 번호가 늘어나는 규칙을 알려 준다", () => {
+  const start = app.slice(
+    app.indexOf("function startPaintPlay("),
+    app.indexOf("function handlePaintEvents(")
+  );
+  assert.ok(start.length > 0, "startPaintPlay 를 찾지 못했다");
+  const hint = start.match(/showHint\("([^"]+)"\)/);
+  assert.ok(hint, "시작 안내 토스트가 없다");
+  assert.match(hint[1], /숫자/, "숫자키 안내가 빠졌다");
+  assert.match(hint[1], /1~5/, "시작 시 다섯 칸이라는 안내가 빠졌다");
+  assert.match(hint[1], /늘어나/, "번호가 늘어난다는 안내가 빠졌다");
 });
