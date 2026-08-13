@@ -5,9 +5,9 @@
 **숫자블록 친구들과 세고, 더하고, 길을 찾고, 지하철을 갈아타는 네다섯 살의 첫 웹 게임**
 
 [![놀이](https://img.shields.io/badge/놀이-9종-4DB6E2?style=flat-square)](#아홉-가지-놀이)
-[![테스트](https://img.shields.io/badge/테스트-706개-7BC67B?style=flat-square)](#테스트)
+[![테스트](https://img.shields.io/badge/테스트-712개-7BC67B?style=flat-square)](#테스트)
 [![의존성](https://img.shields.io/badge/의존성-0-F2A65A?style=flat-square)](#어떻게-만들어졌나)
-[![음성](https://img.shields.io/badge/한국어·영어_음성-626개-C79BE0?style=flat-square)](#소리와-음성)
+[![음성](https://img.shields.io/badge/한국어·영어_음성-630개-C79BE0?style=flat-square)](#소리와-음성)
 [![안내방송](https://img.shields.io/badge/실제_지하철_안내방송-62개_역-9BB7E0?style=flat-square)](#지하철-안내방송-정리)
 [![배포](https://img.shields.io/badge/GitHub_Pages-배포중-6FC7B6?style=flat-square)](https://bliss-forge.github.io/numberblocks-minigame/)
 
@@ -33,7 +33,7 @@ cd numberblocks-minigame
 python3 -m http.server 8000     # 아무 정적 서버나 괜찮습니다
 open http://localhost:8000
 
-npm test                        # 테스트 706개
+npm test                        # 테스트 712개
 ```
 
 `file://` 로 직접 열면 ES 모듈이 막히니 꼭 서버로 띄워 주세요.
@@ -258,7 +258,7 @@ npm test        # node --test tests/*.test.mjs
 
 브라우저 없이 도는 순수 노드 테스트입니다. DOM이 필요한 곳은 가짜 엘리먼트로 대신합니다.
 문제 생성과 채점, 안전길 이동과 신호등, 지하철 경로와 환승, 장면 렌더 계약, 홈 카드 계약,
-반응형 스타일, 음성 자산 존재 여부까지 **706개**가 확인합니다.
+반응형 스타일, 음성 자산 존재 여부까지 **712개**가 확인합니다.
 
 ---
 
