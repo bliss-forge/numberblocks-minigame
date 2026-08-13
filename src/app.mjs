@@ -161,6 +161,8 @@ import {
 } from "./delivery-model.mjs";
 import { deliveryCaption, renderDelivery } from "./delivery-scene.mjs";
 
+import { chooseGrandPrixGate, createGrandPrix, finishGrandPrix, startGrandPrix, setGrandPrixBrake, setGrandPrixThrottle, steerGrandPrix, takeGrandPrixCorrection, tickGrandPrix, useGrandPrixJump } from "./grand-prix-model.mjs?v=20260812-grandprix-v18";
+import { renderGrandPrixScene, updateGrandPrixScene } from "./grand-prix-scene.mjs?v=20260812-grandprix-v18";
 const WALK_REPEAT_MS = 110;
 const audio = new AudioManager();
 const $ = id => document.getElementById(id);
@@ -221,6 +223,9 @@ const state = {
   wrongCount: 0,
   round: 0,
   hintTimer: 0,
+  grandPrix: null,
+  grandPrixScene: null,
+  grandPrixLastFrameAt: 0,
   timers: new Map(),
   recentProblemKeys: []
 };
@@ -2382,6 +2387,8 @@ function startMode(mode) {
   state.delivery = null;
   state.deliveryScene = null;
   state.deliveryBusy = false;
+  state.grandPrix = null;
+  state.grandPrixScene = null;
   stopDeliveryBeat();
   if (mode === "safety") {
     startSafetyRoute();
@@ -2401,6 +2408,10 @@ function startMode(mode) {
     state.safety = null;
     state.safetyView = null;
     startDeliveryRun();
+  } else if (mode === "grandprix") {
+    state.safety = null;
+    state.safetyView = null;
+    startGrandPrixRun();
   } else {
     state.safety = null;
     state.safetyView = null;
@@ -2437,6 +2448,9 @@ function goHome() {
   state.delivery = null;
   state.deliveryScene = null;
   state.deliveryBusy = false;
+  state.grandPrix = null;
+  state.grandPrixScene = null;
+  state.grandPrixLastFrameAt = 0;
   dom.stage.setAttribute("aria-live", "polite");
   state.buffer = "";
   setMode(null);
@@ -2501,6 +2515,12 @@ document.addEventListener("keyup", event => {
 });
 
 dom.stage.addEventListener("click", event => {
+  if (state.mode === "grandprix" && state.grandPrix && state.phase === "playing") {
+    const toggle = event.target.closest("[data-gp-toggle]");
+    const jump = event.target.closest("[data-gp-jump]");
+    if (toggle) { setGrandPrixThrottle(state.grandPrix, !state.grandPrix.drive.throttle); audio.playSfx("key"); refreshGrandPrixScene(); return; }
+    if (jump) { useGrandPrixJump(state.grandPrix); audio.playSfx("pop"); refreshGrandPrixScene(); return; }
+  }
   // 택배 왔어요! — 방향·출발·층·벨·좌우 버튼을 한자리에서 받는다.
   if (state.mode === "delivery" && state.delivery && state.phase === "playing" &&
       !state.deliveryBusy) {
@@ -2579,9 +2599,31 @@ dom.stage.addEventListener("click", event => {
   else if (state.srt) moveSrt(button.dataset.routeDirection);
   else moveSafetyRoute(button.dataset.routeDirection);
 });
-document.addEventListener("pointerup", stopSafetyHold);
-document.addEventListener("pointercancel", stopSafetyHold);
-dom.stage.addEventListener("pointerleave", stopSafetyHold);
+function setGrandPrixHold(kind, active) {
+  if (state.mode !== "grandprix" || state.phase !== "playing" || !state.grandPrix) return;
+  if (kind === "left" || kind === "right") steerGrandPrix(state.grandPrix, kind, active);
+  if (kind === "throttle") setGrandPrixThrottle(state.grandPrix, active);
+  if (kind === "brake") setGrandPrixBrake(state.grandPrix, active);
+}
+function clearGrandPrixHold() {
+  ["left", "right", "throttle", "brake"].forEach(kind => setGrandPrixHold(kind, false));
+}
+dom.stage.addEventListener("pointerdown", event => {
+  const hold = event.target.closest("[data-gp-hold]");
+  if (!hold) return;
+  event.preventDefault();
+  setGrandPrixHold(hold.dataset.gpHold, true);
+});
+document.addEventListener("pointerup", () => { stopSafetyHold(); clearGrandPrixHold(); });
+document.addEventListener("pointercancel", () => { stopSafetyHold(); clearGrandPrixHold(); });
+dom.stage.addEventListener("pointerleave", () => { stopSafetyHold(); clearGrandPrixHold(); });
+document.addEventListener("keyup", event => {
+  if (state.phase !== "playing" || state.mode !== "grandprix" || !state.grandPrix) return;
+  if (event.key === "ArrowLeft") steerGrandPrix(state.grandPrix, "left", false);
+  if (event.key === "ArrowRight") steerGrandPrix(state.grandPrix, "right", false);
+  if (event.key === "ArrowUp" || event.key.toLowerCase() === "w") setGrandPrixThrottle(state.grandPrix, false);
+  if (event.key === "ArrowDown" || event.key.toLowerCase() === "s") setGrandPrixBrake(state.grandPrix, false);
+});
 
 dom.homeButton.addEventListener("click", goHome);
 dom.mute.addEventListener("click", () => {
@@ -2607,6 +2649,29 @@ document.addEventListener("keydown", event => {
       startFamilyLine();
     }
     return;
+  }
+
+  if (state.phase === "playing" && state.mode === "grandprix" && state.grandPrix) {
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault();
+      steerGrandPrix(state.grandPrix, event.key === "ArrowLeft" ? "left" : "right", true);
+      return;
+    }
+    if (event.key === "ArrowUp" || event.key.toLowerCase() === "w") {
+      event.preventDefault();
+      setGrandPrixThrottle(state.grandPrix, true);
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key.toLowerCase() === "s") {
+      event.preventDefault();
+      setGrandPrixBrake(state.grandPrix, true);
+      return;
+    }
+    if (event.key === " " || event.key === "Spacebar") {
+      event.preventDefault();
+      if (!event.repeat) { useGrandPrixJump(state.grandPrix); audio.playSfx("pop"); }
+      return;
+    }
   }
 
   // 물감 놀이 — ←/→ 포커스, ⎵ 고르기, 숫자키 = 튜브. 섞기·칠하기는 자동.
@@ -2964,3 +3029,47 @@ window.addEventListener("resize", () => scheduleCharacterFit());
 syncMuteButton();
 syncDifficulty();
 preloadCharacters();
+
+
+
+function refreshGrandPrixScene() {
+  if (!state.grandPrix) return;
+  if (!state.grandPrixScene) {
+    state.grandPrixScene = renderGrandPrixScene(document, state.grandPrix);
+    dom.stage.replaceChildren(state.grandPrixScene);
+  } else {
+    updateGrandPrixScene(state.grandPrixScene, state.grandPrix);
+  }
+}
+
+function grandPrixFrame(round, nowMs) {
+  if (state.round !== round || state.mode !== "grandprix" || !state.grandPrix) return;
+  const elapsed = Math.min(50, Math.max(0, nowMs - state.grandPrixLastFrameAt));
+  state.grandPrixLastFrameAt = nowMs;
+  tickGrandPrix(state.grandPrix, elapsed);
+  if (state.grandPrix.lap > state.grandPrix.totalLaps && state.grandPrix.checkpoint === 3) {
+    const events = finishGrandPrix(state.grandPrix);
+    if (events.length) audio.playSfx("win");
+  }
+  refreshGrandPrixScene();
+  requestAnimationFrame(next => grandPrixFrame(round, next));
+}
+
+function startGrandPrixRun() {
+  stopSafetyHold();
+  stopDeliveryBeat();
+  clearTimers();
+  audio.cancel();
+  state.round += 1;
+  state.problem = null;
+  state.buffer = "";
+  state.grandPrix = createGrandPrix(state.difficulty, Date.now());
+  state.grandPrixScene = null;
+  state.grandPrixLastFrameAt = performance.now();
+  dom.stage.setAttribute("aria-live", "off");
+  setPhase("playing");
+  startGrandPrix(state.grandPrix);
+  refreshGrandPrixScene();
+  audio.playSfx("win");
+  requestAnimationFrame(nowMs => grandPrixFrame(state.round, nowMs));
+}
