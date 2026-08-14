@@ -493,10 +493,12 @@ function renderProblem(problem) {
 
   dom.problem.textContent = formatProblemText(problem);
 
-  if (problem.mode === "mul") {
-    // 곱하기는 "블록판에는 모두 몇 개가 있을까요?"를 묻는다 — 피연산자 두 장이
-    // 아니라 줄×칸으로 세워야 아이가 세어 답을 구할 수 있다. 다만 줄을 채우는
-    // 것은 익명 네모가 아니라 칸 수만큼의 블록으로 그려진 친구다.
+  // 곱하기는 "블록판에는 모두 몇 개가 있을까요?"를 묻는다 — 친구를 여럿 세워야
+  // 아이가 세어 답을 구할 수 있다(4×5면 4 친구가 다섯 명). 다만 어느 한쪽이 열을
+  // 넘으면 친구가 너무 작아지거나 너무 많아져 셀 수 없다 — 10×13은 13명이 줄지어
+  // 서서 아무것도 안 읽혔다(대장 지적 2026-08-14). 그때는 덧셈·뺄셈과 같은 두
+  // 캐릭터 장면으로 물러난다. 쉬움·차근차근은 양쪽 다 10 이하라 늘 친구 장면이다.
+  if (problem.mode === "mul" && problem.operands.every(value => value <= 10)) {
     const board = multiplicationBoard(document, problem,
       (number, className) => character(number, className, "problem"));
     board.querySelectorAll(".mul-friend").forEach(image => {

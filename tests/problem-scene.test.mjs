@@ -116,13 +116,13 @@ test("곱하기 블록판은 곱하기 문제만 받는다", () => {
   );
 });
 
-test("곱하기 줄은 칸 수만큼의 블록으로 그려진 친구 한 명이 채운다", () => {
-  // 2026-08-14: 감사 대응으로 들어간 익명 노란 네모가 넘버블럭스 친구를 밀어냈다.
-  // 캐릭터 그림 자체가 제 수만큼의 블록이라 세기와 친구가 한 그림에서 같이 된다.
+test("곱하기 친구 장면은 왼쪽 수 친구를 오른쪽 수만큼 세운다", () => {
+  // 2026-08-14 대장 지적: 10×1이 "1 친구 열 명"으로 나왔다. 말(10 곱하기 1)과
+  // 그림(10 친구 한 명)이 같아야 한다. 4×5면 4 친구가 다섯 명이다.
   const made = [];
   const board = multiplicationBoard(
     fakeDocument,
-    { mode: "mul", operands: [5, 2], answer: 10 },
+    { mode: "mul", operands: [4, 5], answer: 20 },
     (number, className) => {
       made.push([number, className]);
       const image = fakeDocument.createElement("img");
@@ -132,24 +132,41 @@ test("곱하기 줄은 칸 수만큼의 블록으로 그려진 친구 한 명이
     }
   );
 
-  const rows = byClass(board, "mul-row");
-  assert.equal(rows.length, 5, "줄 수 = 왼쪽 수");
-  assert.deepEqual(made, Array.from({ length: 5 }, () => [2, "mul-friend"]),
-    "줄마다 오른쪽 수 친구 한 명");
-  for (const row of rows) {
-    assert.equal(row.children.length, 1, "한 줄에 친구 한 명");
-    assert.equal(row.dataset.friend, "2");
+  const groups = byClass(board, "mul-row");
+  assert.equal(groups.length, 5, "사람 수 = 오른쪽 수");
+  assert.deepEqual(made, Array.from({ length: 5 }, () => [4, "mul-friend"]),
+    "모두 왼쪽 수 친구");
+  for (const group of groups) {
+    assert.equal(group.children.length, 1, "한 자리에 친구 한 명");
+    assert.equal(group.dataset.friend, "4");
   }
   assert.equal(
     descendants(board).filter(node => node.tagName === "I").length, 0,
     "익명 네모는 남지 않는다"
   );
-  assert.equal(board.attributes.get("aria-label"), "5줄 2칸, 모두 10개");
+  assert.equal(board.attributes.get("aria-label"), "4 친구 5명, 모두 20개");
 });
 
-test("캐릭터 생성기가 없으면 예전 네모 줄로 물러난다", () => {
+test("한 명짜리 곱셈도 친구 한 명으로 그린다", () => {
+  const made = [];
+  const board = multiplicationBoard(
+    fakeDocument,
+    { mode: "mul", operands: [10, 1], answer: 10 },
+    (number, className) => {
+      made.push(number);
+      const image = fakeDocument.createElement("img");
+      image.className = className;
+      return image;
+    }
+  );
+  assert.equal(byClass(board, "mul-row").length, 1, "10 × 1 은 친구 한 명");
+  assert.deepEqual(made, [10]);
+});
+
+test("캐릭터 생성기가 없으면 예전 줄×칸 네모판으로 물러난다", () => {
   const board = multiplicationBoard(
     fakeDocument, { mode: "mul", operands: [2, 3], answer: 6 });
   assert.equal(
     descendants(board).filter(node => node.tagName === "I").length, 6);
+  assert.equal(byClass(board, "mul-row").length, 2, "네모판은 왼쪽 수만큼 줄");
 });
