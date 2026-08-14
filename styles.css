@@ -1004,6 +1004,56 @@ body[data-state="celebrating"] .celebration-character-zone .character {
   box-shadow: inset 0 -3px rgba(167, 111, 0, .14);
 }
 
+/* 친구 한 명이 한 줄을 채운다 — 칸 격자가 아니라 가운데 정렬 한 칸이다.
+   크기는 --mul-block(네모 한 칸 기준)이 아니라 **줄이 나눠 갖는 높이**로 정한다.
+   블록 기준으로 재면 줄이 늘수록 친구가 눈에 안 보일 만큼 작아진다(8×6에서
+   15px까지 내려갔다). 그림 자체가 칸 수만큼의 블록이라 폭은 그림이 정한다. */
+/* 친구는 가로로 나란히 선다. 넘버블럭스는 제 수만큼의 블록이 **세로로 쌓인**
+   기둥이라, 기둥을 다시 세로로 포개면 줄이 안 읽히고 한 명당 높이도 잘게 쪼개진다.
+   나란히 세우면 "7 친구가 세 명" 이 한눈에 들어오고 각자 화면 높이를 다 쓴다. */
+.mul-board[data-render="friends"] .mul-rows {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  gap: clamp(4px, 1.2vw, 16px);
+}
+
+/* 한 명의 자리를 여기서 못 박는다. 이미지 쪽에 %를 쓰면 부모 높이가 내용으로
+   정해지는 순환이 생겨 원본 1498px 그대로 터진다(실측). 뷰포트 기준 상자를
+   주고 이미지는 그 안에 contain 시킨다. */
+.mul-board[data-render="friends"] .mul-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 폭은 판이 실제로 가진 너비를 사람 수로 나눠 갖는다(flex: 1 1 0). vw로 나누면
+     판 너비(min(94%, 980px))와 어긋나 아홉 명에서 58px 넘쳤다(실측). */
+  flex: 0 1 auto;
+  max-width: 200px;
+  height: auto;
+  min-height: 0;
+  min-width: 0;
+  padding: clamp(4px, .9vh, 12px);
+  border-radius: clamp(10px, 1.6vh, 22px);
+}
+
+.mul-board[data-render="friends"] .mul-friend {
+  /* 폭은 flex가 나눠 준 값(확정), 높이는 그 비율대로 따라온다 — 높이를 못 박으면
+     정사각 친구가 세로로 긴 알약 안에서 letterbox 되어 작아 보인다. */
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: min(30vh, 240px);
+  object-fit: contain;
+  /* 줄 높이가 이미 크기를 정하므로 캐릭터 자동 배율은 여기서 끈다 —
+     둘이 함께 걸리면 줄 밖으로 넘치거나 줄마다 크기가 달라진다. */
+  scale: 1;
+  animation: none;
+}
+
 .operand-scene {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;

@@ -115,3 +115,41 @@ test("곱하기 블록판은 곱하기 문제만 받는다", () => {
     TypeError
   );
 });
+
+test("곱하기 줄은 칸 수만큼의 블록으로 그려진 친구 한 명이 채운다", () => {
+  // 2026-08-14: 감사 대응으로 들어간 익명 노란 네모가 넘버블럭스 친구를 밀어냈다.
+  // 캐릭터 그림 자체가 제 수만큼의 블록이라 세기와 친구가 한 그림에서 같이 된다.
+  const made = [];
+  const board = multiplicationBoard(
+    fakeDocument,
+    { mode: "mul", operands: [5, 2], answer: 10 },
+    (number, className) => {
+      made.push([number, className]);
+      const image = fakeDocument.createElement("img");
+      image.className = className;
+      image.dataset.number = String(number);
+      return image;
+    }
+  );
+
+  const rows = byClass(board, "mul-row");
+  assert.equal(rows.length, 5, "줄 수 = 왼쪽 수");
+  assert.deepEqual(made, Array.from({ length: 5 }, () => [2, "mul-friend"]),
+    "줄마다 오른쪽 수 친구 한 명");
+  for (const row of rows) {
+    assert.equal(row.children.length, 1, "한 줄에 친구 한 명");
+    assert.equal(row.dataset.friend, "2");
+  }
+  assert.equal(
+    descendants(board).filter(node => node.tagName === "I").length, 0,
+    "익명 네모는 남지 않는다"
+  );
+  assert.equal(board.attributes.get("aria-label"), "5줄 2칸, 모두 10개");
+});
+
+test("캐릭터 생성기가 없으면 예전 네모 줄로 물러난다", () => {
+  const board = multiplicationBoard(
+    fakeDocument, { mode: "mul", operands: [2, 3], answer: 6 });
+  assert.equal(
+    descendants(board).filter(node => node.tagName === "I").length, 6);
+});

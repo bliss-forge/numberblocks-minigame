@@ -494,9 +494,21 @@ function renderProblem(problem) {
   dom.problem.textContent = formatProblemText(problem);
 
   if (problem.mode === "mul") {
-    // 곱하기는 "블록판에는 모두 몇 개가 있을까요?"를 묻는다 — 캐릭터 두 장이
-    // 아니라 줄×칸 블록판을 그려야 아이가 세어 답을 구할 수 있다.
-    dom.stage.append(multiplicationBoard(document, problem));
+    // 곱하기는 "블록판에는 모두 몇 개가 있을까요?"를 묻는다 — 피연산자 두 장이
+    // 아니라 줄×칸으로 세워야 아이가 세어 답을 구할 수 있다. 다만 줄을 채우는
+    // 것은 익명 네모가 아니라 칸 수만큼의 블록으로 그려진 친구다.
+    const board = multiplicationBoard(document, problem,
+      (number, className) => character(number, className, "problem"));
+    board.querySelectorAll(".mul-friend").forEach(image => {
+      image.addEventListener("error", () => {
+        const fallback = document.createElement("strong");
+        fallback.className = "operand-fallback";
+        fallback.textContent = image.dataset.number;
+        image.replaceWith(fallback);
+      }, { once: true });
+    });
+    dom.stage.append(board);
+    scheduleCharacterFit(board);
     return;
   }
 

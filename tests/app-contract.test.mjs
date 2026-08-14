@@ -328,7 +328,10 @@ test("오른쪽 아래에 bliss 제작자 서명을 표시한다", () => {
 
 // 감사(2026-08-06) 회귀 가드 — 둘 다 app.mjs 결선이라 소스 계약으로 지킨다
 // (실동작은 브라우저 검증으로 확인했고, 여정 41스텝 자동 플레이는 스위트에 넣기엔 무겁다).
-test("곱하기 문제는 피연산자 캐릭터 대신 줄·칸 블록판을 그린다", () => {
+test("곱하기 문제는 줄·칸으로 세운 블록 친구를 그린다", () => {
+  // 두 계약이 함께 있다. 줄·칸 장면이어야 아이가 답을 세어 구할 수 있고(2026-08-06),
+  // 그 줄을 채우는 것은 익명 네모가 아니라 친구여야 한다(2026-08-14 지적 —
+  // 감사 대응이 친구를 네모로 갈아치웠고 "이상한 네모"라는 말이 돌아왔다).
   assert.match(app, /multiplicationBoard/);
   const render = app.slice(
     app.indexOf("function renderProblem("),
@@ -340,7 +343,16 @@ test("곱하기 문제는 피연산자 캐릭터 대신 줄·칸 블록판을 �
     mulBranch < render.indexOf("operandScene("),
     "mul 분기가 피연산자 장면보다 먼저 온다"
   );
-  assert.ok(render.includes("multiplicationBoard(document, problem)"));
+  const call = render.slice(
+    render.indexOf("multiplicationBoard("),
+    render.indexOf("dom.stage.append(board)")
+  );
+  assert.match(call, /document,\s*problem,/, "블록판에 문제를 넘긴다");
+  assert.match(
+    call,
+    /character\(number,\s*className,\s*"problem"\)/,
+    "줄을 채울 캐릭터 생성기를 함께 넘긴다 — 빠지면 네모로 되돌아간다"
+  );
 });
 
 test("지하철 도착지 사진은 화면 패드 입력으로도 움직인다", () => {
