@@ -33,31 +33,33 @@ export function multiplicationBoard(document, problem, createCharacter = null) {
   if (problem.mode !== "mul") {
     throw new TypeError("multiplication board requires mul mode");
   }
-  const [rows, cols] = problem.operands;
+  // 두 장면이 같은 문장을 그린다: **왼쪽 수가 오른쪽 수만큼 있다.**
+  // 친구 장면은 왼쪽 수 친구를 오른쪽 수만큼 세우고, 네모판은 왼쪽 수 칸짜리
+  // 줄을 오른쪽 수만큼 쌓는다. rows/cols 로 부르면 친구 장면에서 이름이
+  // 거짓말을 한다 — 그 혼동이 4×5를 "5 친구 넷"으로 그리게 했다.
+  const [friend, count] = problem.operands;
   const board = document.createElement("div");
   board.className = "mul-board";
   board.dataset.render = createCharacter ? "friends" : "blocks";
-  board.dataset.rows = String(rows);
-  board.dataset.cols = String(cols);
-  board.style.setProperty("--mul-rows", String(rows));
-  board.style.setProperty("--mul-cols", String(cols));
+  board.dataset.friendValue = String(friend);
+  board.dataset.count = String(count);
+  board.style.setProperty("--mul-rows", String(count));
+  board.style.setProperty("--mul-cols", String(friend));
   board.setAttribute("aria-label", createCharacter
-    ? `${rows} 친구 ${cols}명, 모두 ${problem.answer}개`
-    : `${rows}줄 ${cols}칸, 모두 ${problem.answer}개`);
+    ? `${friend} 친구 ${count}명, 모두 ${problem.answer}개`
+    : `${friend}칸 줄 ${count}개, 모두 ${problem.answer}개`);
 
   const grid = document.createElement("div");
   grid.className = "mul-rows";
-  // 친구 장면은 "왼쪽 친구가 오른쪽 수만큼", 네모판은 예전대로 "왼쪽 줄 × 오른쪽 칸".
-  const groups = createCharacter ? cols : rows;
-  for (let group = 0; group < groups; group += 1) {
+  for (let group = 0; group < count; group += 1) {
     const line = document.createElement("span");
     line.className = "mul-row";
     line.dataset.row = String(group + 1);
     if (createCharacter) {
-      line.dataset.friend = String(rows);
-      line.append(createCharacter(rows, "mul-friend"));
+      line.dataset.friend = String(friend);
+      line.append(createCharacter(friend, "mul-friend"));
     } else {
-      for (let column = 0; column < cols; column += 1) {
+      for (let column = 0; column < friend; column += 1) {
         const block = document.createElement("i");
         block.setAttribute("aria-hidden", "true");
         line.append(block);

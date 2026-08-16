@@ -73,30 +73,31 @@ test("숫자 세기는 피연산자 장면을 만들지 않는다", () => {
 // 감사(2026-08-06): 곱하기 카드 부제("줄과 칸을 세어요")와 음성("블록판에는 모두
 // 몇 개가 있을까요?")이 말하는 블록판이 화면에 없어서, 구구단을 모르는 아이가
 // 답을 세어 구할 방법이 없었다. 줄×칸 블록판이 그 문구의 화면 대응물이다.
-test("곱하기 블록판은 줄 수 × 칸 수 블록을 그리고 총합이 답과 같다", () => {
+test("네모판은 왼쪽 수 칸짜리 줄을 오른쪽 수만큼 쌓고 총합이 답과 같다", () => {
+  // 친구 장면과 같은 문장을 그린다 — 왼쪽 수가 오른쪽 수만큼 있다.
   const problem = { mode: "mul", operands: [4, 6], answer: 24 };
   const board = multiplicationBoard(fakeDocument, problem);
 
-  const rows = byClass(board, "mul-row");
-  assert.equal(rows.length, 4, "줄 수 = 왼쪽 수");
-  for (const row of rows) {
-    assert.equal(row.children.length, 6, "한 줄의 칸 수 = 오른쪽 수");
+  const lines = byClass(board, "mul-row");
+  assert.equal(lines.length, 6, "줄 개수 = 오른쪽 수");
+  for (const line of lines) {
+    assert.equal(line.children.length, 4, "한 줄의 칸 수 = 왼쪽 수");
   }
   const blocks = descendants(board).filter(node => node.tagName === "I");
   assert.equal(blocks.length, 24, "블록 총합 = 답");
 
-  assert.equal(board.dataset.rows, "4");
-  assert.equal(board.dataset.cols, "6");
-  assert.equal(board.style.values.get("--mul-rows"), "4");
-  assert.equal(board.style.values.get("--mul-cols"), "6");
-  assert.equal(board.attributes.get("aria-label"), "4줄 6칸, 모두 24개");
+  assert.equal(board.dataset.friendValue, "4");
+  assert.equal(board.dataset.count, "6");
+  assert.equal(board.style.values.get("--mul-rows"), "6");
+  assert.equal(board.style.values.get("--mul-cols"), "4");
+  assert.equal(board.attributes.get("aria-label"), "4칸 줄 6개, 모두 24개");
   assert.equal(byClass(board, "equation-label")[0].textContent, "4 × 6");
 });
 
-test("곱하기 블록판은 한 줄이 한 묶음으로 읽히게 줄마다 번호를 남긴다", () => {
+test("네모판도 한 줄이 한 묶음으로 읽히게 줄마다 번호를 남긴다", () => {
   const board = multiplicationBoard(fakeDocument, {
     mode: "mul",
-    operands: [3, 5],
+    operands: [5, 3],
     answer: 15
   });
   assert.deepEqual(
@@ -163,10 +164,11 @@ test("한 명짜리 곱셈도 친구 한 명으로 그린다", () => {
   assert.deepEqual(made, [10]);
 });
 
-test("캐릭터 생성기가 없으면 예전 줄×칸 네모판으로 물러난다", () => {
+test("캐릭터 생성기가 없으면 네모판으로 물러나되 배치는 같다", () => {
   const board = multiplicationBoard(
     fakeDocument, { mode: "mul", operands: [2, 3], answer: 6 });
   assert.equal(
     descendants(board).filter(node => node.tagName === "I").length, 6);
-  assert.equal(byClass(board, "mul-row").length, 2, "네모판은 왼쪽 수만큼 줄");
+  assert.equal(byClass(board, "mul-row").length, 3,
+    "친구 장면과 같은 수의 묶음 — 이미지 실패로 배치가 뒤집히지 않는다");
 });
