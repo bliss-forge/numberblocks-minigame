@@ -882,6 +882,11 @@ body[data-state="celebrating"] .celebration-character-zone .character {
 .count-friends {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* 행도 못 박는다. 없으면 행 트랙이 내용만큼(383px) 늘어나 컨테이너 높이(360px)를
+     넘고, 그러면 .count-character 의 max-height: 100% 가 늘어난 행을 기준으로
+     해석돼 무의미해진다 — 1280×720에서 블록 하단이 프레임 밖으로 80px 잘려
+     그림대로 센 아이가 오답을 맞았다(심층 검토 P0-1, 실측). */
+  grid-template-rows: minmax(0, 1fr);
   place-items: center;
   gap: clamp(12px, 3vw, 36px);
   width: min(72vw, 720px);

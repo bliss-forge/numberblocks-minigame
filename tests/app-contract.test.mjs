@@ -504,3 +504,60 @@ test("물감 시작 안내는 숫자키와 번호가 늘어나는 규칙을 알�
   assert.match(hint[1], /1~5/, "시작 시 다섯 칸이라는 안내가 빠졌다");
   assert.match(hint[1], /늘어나/, "번호가 늘어난다는 안내가 빠졌다");
 });
+
+// ── 심층 검토(2026-08-17) P0 회귀 가드 ──────────────────────────────────────
+
+test("택배 화면 버튼 키는 클릭 디스패처 셀렉터와 정확히 일치한다", async () => {
+  // P0-2: 'go'를 'beat'로 개명하며 셀렉터를 안 고쳐 '빵빵!'·'박자!' 버튼이
+  // 클릭·터치에 완전 무반응이었다. 키보드 없는 태블릿에서는 리듬 하역이 유일한
+  // 진행 수단이라 씬 ②에서 영구 정지였다.
+  const scene = await readFile(
+    new URL("../src/delivery-scene.mjs", import.meta.url), "utf8");
+  const rendered = new Set(
+    [...scene.matchAll(/\{\s*(dv[A-Z][A-Za-z]*)\s*:/g)]
+      .map(match => match[1].replace(/[A-Z]/g, c => `-${c.toLowerCase()}`))
+      .map(name => `data-${name}`)
+  );
+  assert.ok(rendered.size >= 5, `렌더되는 data-dv-* 키를 찾아야 한다: ${[...rendered]}`);
+
+  const selector = app.slice(app.indexOf('"[data-dv-dir]'))
+    .slice(0, app.slice(app.indexOf('"[data-dv-dir]')).indexOf(");"));
+  const listed = new Set(
+    [...selector.matchAll(/\[(data-dv-[a-z]+)\]/g)].map(match => match[1]));
+
+  for (const key of rendered) {
+    assert.ok(listed.has(key), `${key} 버튼이 렌더되는데 디스패처가 못 잡는다`);
+  }
+  for (const key of listed) {
+    assert.ok(rendered.has(key), `${key} 는 렌더되지 않는 죽은 셀렉터다`);
+  }
+});
+
+test("숫자 답을 받지 않는 모드는 숫자키를 흡수하고 onDigit 은 problem 없이 돌지 않는다", () => {
+  // P0-3: safety 분기가 숫자키를 흘려보내 onDigit 에서 state.problem 이 null 인
+  // 채로 answer 를 읽어 매 입력마다 uncaught TypeError 가 났다.
+  const safetyBranch = app.slice(
+    app.indexOf('state.mode === "safety"\n  ) {'),
+    app.indexOf('if (event.key === "Backspace"')
+  );
+  assert.match(safetyBranch, /\/\^\[0-9\]\$\/\.test\(event\.key\)/,
+    "길찾기 분기가 숫자키를 흡수해야 한다");
+  const onDigit = app.slice(
+    app.indexOf("function onDigit("), app.indexOf("function deleteDigit("));
+  assert.match(onDigit, /if\s*\(!state\.problem\)\s*return;/,
+    "onDigit 은 problem 이 없으면 즉시 빠져야 한다");
+  assert.ok(
+    onDigit.indexOf("!state.problem") < onDigit.indexOf("state.problem.answer"),
+    "가드가 answer 접근보다 앞에 와야 한다"
+  );
+});
+
+test("홈에서 ↑/↓ 는 난이도 줄과 카드 판을 잇는다", () => {
+  // P0-4: 방향키만 쓰는 아이는 난이도에 닿을 방법이 없어 도전 지도와 SRT 여정이
+  // 키보드만으로는 열리지 않았다. CLAUDE.md 계약은 난이도도 방향키로 고른다.
+  const home = app.slice(app.indexOf('state.phase === "home" && ["ArrowUp"'));
+  assert.ok(home.length > 0, "홈 ↑/↓ 분기가 있어야 한다");
+  const branch = home.slice(0, home.indexOf("ArrowLeft"));
+  assert.match(branch, /ArrowUp[\s\S]*difficultyControls/, "↑ 는 난이도로 올라간다");
+  assert.match(branch, /ArrowDown[\s\S]*modeControls/, "↓ 는 카드로 내려온다");
+});

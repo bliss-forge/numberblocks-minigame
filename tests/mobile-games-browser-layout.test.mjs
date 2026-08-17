@@ -717,3 +717,41 @@ test("844×390 실사 기관사 화면은 창과 조작부를 클리핑 없이 �
   assert.ok(metrics.controls[2].height >= 48, "stop prompt height");
   assert.deepEqual(errors, { consoleErrors: [], pageErrors: [] });
 });
+
+test("1280×720 에서 세어야 할 블록이 프레임 안에 다 들어온다", async t => {
+  // 심층 검토 P0-1: 그리드 행 트랙이 내용만큼 늘어나 캐릭터가 .stage-frame 아래로
+  // 80~87px 잘렸다. 세는 게 이 게임의 전부라, 그림대로 센 아이가 오답을 맞았다.
+  const chromium = loadChromium();
+  if (!chromium) {
+    t.skip("Playwright is not installed globally");
+    return;
+  }
+
+  const { server, url } = await startStaticServer();
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    const overflows = [];
+    for (const difficulty of ["easy", "steady"]) {   // 도전에서는 1번 카드가 비활성이다
+      for (let round = 0; round < 5; round += 1) {
+        await page.goto(url, { waitUntil: "load" });
+        await page.click(`[data-difficulty="${difficulty}"]`);
+        await page.click('[data-mode="count"]');
+        await page.waitForSelector(".count-character");
+        await page.waitForTimeout(450);
+        overflows.push(await page.evaluate(() => {
+          const frame = document.querySelector(".stage-frame").getBoundingClientRect();
+          const chars = [...document.querySelectorAll(".count-character")];
+          return Math.round(Math.max(
+            ...chars.map(node => node.getBoundingClientRect().bottom - frame.bottom)));
+        }));
+      }
+    }
+    const worst = Math.max(...overflows);
+    assert.ok(worst <= 0,
+      `블록 하단이 프레임을 ${worst}px 넘었다 — 세면 오답이 된다 (${overflows.join(",")})`);
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});

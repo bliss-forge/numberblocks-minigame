@@ -275,9 +275,27 @@ function character(number, className = "", scene = "neutral") {
   return image;
 }
 
+// 세기 장면은 캐릭터 두 장이 한 그리드를 나눠 쓴다. 존 전체 폭을 주면 한 명이
+// 그 폭을 다 쓸 수 있다고 계산해 두 배로 커진다 — 칸 폭으로 나눠 넘긴다.
+function characterZoneBox(zone, image) {
+  if (!zone.classList.contains("count-friends")) {
+    return { width: zone.clientWidth, height: zone.clientHeight };
+  }
+  const siblings = zone.querySelectorAll(".count-character").length || 1;
+  const gap = Number.parseFloat(getComputedStyle(zone).columnGap) || 0;
+  const columns = Math.min(siblings, 2);
+  return {
+    width: Math.max(0, (zone.clientWidth - gap * (columns - 1)) / columns),
+    height: zone.clientHeight
+  };
+}
+
 function fitSceneCharacter(image) {
+  // .count-friends 가 여기 없으면 세기 캐릭터는 배율 상한을 못 받는다. 그 상태에서
+  // scale: 변환이 레이아웃 박스를 넘겨 1280×720에서 블록 하단이 프레임 밖으로
+  // 80~87px 잘렸다 — 그림대로 센 아이가 오답을 맞는다(심층 검토 P0-1, 실측).
   const zone = image.closest(
-    ".operand-slot, .celebration-character-zone"
+    ".operand-slot, .celebration-character-zone, .count-friends"
   );
   const metric = CHARACTER_VISUAL_METRICS[Number(image.dataset.number)];
   if (!zone || !metric) return;
@@ -289,9 +307,10 @@ function fitSceneCharacter(image) {
     boxHeight: image.clientHeight
   });
 
+  const box = characterZoneBox(zone, image);
   const cap = characterLayoutScaleCap({
-    zoneWidth: zone.clientWidth,
-    zoneHeight: zone.clientHeight,
+    zoneWidth: box.width,
+    zoneHeight: box.height,
     imageWidth: bitmap?.width ?? 0,
     imageHeight: bitmap?.height ?? 0,
     metric,
@@ -486,7 +505,10 @@ function renderProblem(problem) {
 
   if (problem.mode === "count") {
     dom.problem.textContent = formatProblemText(problem);
-    dom.stage.append(countFriends(problem.answer));
+    const friends = countFriends(problem.answer);
+    dom.stage.append(friends);
+    // 세는 게 이 게임의 전부다 — 블록이 프레임에 다 들어와야 한다(P0-1).
+    scheduleCharacterFit(friends);
     if (problem.answer > 10) scheduleCountHint(problem.answer);
     return;
   }
@@ -1757,6 +1779,10 @@ function wrongAnswer() {
 
 function onDigit(digit) {
   if (state.phase !== "playing") return;
+  // 숫자 답을 받지 않는 게임(길찾기·지하철·기관사·물감·택배)에서 키가 여기까지
+  // 새면 problem 이 null 이다. 각 모드가 흡수하는 것이 원칙이지만, 새 게임이
+  // 하나 빠뜨려도 크래시가 아이 화면까지 가지 않게 여기서 한 겹 더 막는다.
+  if (!state.problem) return;
   audio.playSfx("key");
   const result = applyDigit(state.buffer, digit, state.problem.answer);
   state.buffer = result.buffer;
@@ -2518,9 +2544,13 @@ dom.stage.addEventListener("click", event => {
   // 택배 왔어요! — 방향·출발·층·벨·좌우 버튼을 한자리에서 받는다.
   if (state.mode === "delivery" && state.delivery && state.phase === "playing" &&
       !state.deliveryBusy) {
+    // 아래 목록은 delivery-scene 이 실제로 렌더하는 키와 정확히 같아야 한다.
+    // horn·beat 이 빠져 있어 '빵빵!'과 '박자!' 버튼이 클릭·터치에 완전 무반응이었다
+    // — 키보드 없는 태블릿에서는 리듬 하역이 유일한 진행 수단이라 씬 ②에서
+    // 영구 정지였다(심층 검토 P0-2). go·clear 는 렌더되지 않는 이름이라 뺀다.
     const control = event.target.closest(
-      "[data-dv-dir],[data-dv-go],[data-dv-floor],[data-dv-bell],[data-dv-move]," +
-      "[data-dv-clear],[data-dv-home]"
+      "[data-dv-dir],[data-dv-horn],[data-dv-beat],[data-dv-floor]," +
+      "[data-dv-bell],[data-dv-move],[data-dv-home]"
     );
     if (control) {
       const data = control.dataset;
@@ -2907,11 +2937,39 @@ document.addEventListener("keydown", event => {
       }
       return;
     }
+    // 숫자키를 흘려보내면 onDigit 까지 내려가 state.problem 이 null 인 채로
+    // answer 를 읽어 매번 TypeError 가 났다(심층 검토 P0-3, 실측 재현).
+    // 1~4번 게임에서 숫자키가 정답 입력이라 아이는 게임 구분 없이 가장 많이
+    // 누르는 키다. KTX·택배·물감처럼 여기서 흡수한다.
+    if (/^[0-9]$/.test(event.key)) {
+      event.preventDefault();
+      if (!event.repeat) audio.playSfx("pop");
+      return;
+    }
   }
 
   if (event.key === "Backspace" && state.phase === "playing") {
     event.preventDefault();
     deleteDigit();
+    return;
+  }
+
+  // 홈에서 ↑/↓ 는 난이도 줄과 카드 판을 오간다. 없으면 방향키만 쓰는 아이는
+  // 난이도에 영원히 닿지 못한다 — 도전 지도와 SRT 여정이 키보드만으로는 열리지
+  // 않았다(심층 검토 P0-4, 실측: 방향키 24번에 카드 9장만 순환).
+  // CLAUDE.md 계약: "카드와 난이도 모두 ←/→ 포커스 이동 + Space·Enter".
+  if (state.phase === "home" && ["ArrowUp", "ArrowDown"].includes(event.key)) {
+    event.preventDefault();
+    const onDifficulty = difficultyControls.includes(document.activeElement);
+    if (event.key === "ArrowUp" && !onDifficulty) {
+      (difficultyControls.find(button => button.dataset.difficulty === state.difficulty)
+        ?? difficultyControls[0])?.focus();
+      return;
+    }
+    if (event.key === "ArrowDown" && onDifficulty) {
+      (modeControls.find(card => !card.disabled))?.focus();
+      return;
+    }
     return;
   }
 
