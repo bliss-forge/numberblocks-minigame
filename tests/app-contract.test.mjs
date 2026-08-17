@@ -561,3 +561,57 @@ test("홈에서 ↑/↓ 는 난이도 줄과 카드 판을 잇는다", () => {
   assert.match(branch, /ArrowUp[\s\S]*difficultyControls/, "↑ 는 난이도로 올라간다");
   assert.match(branch, /ArrowDown[\s\S]*modeControls/, "↓ 는 카드로 내려온다");
 });
+
+test("홈 카드 아홉 장 모두 제 색과 불투명한 번호 배지를 갖는다", () => {
+  // P1-1: 카드가 6→9장으로 늘 때 색 정의가 따라오지 않아 7~9가 폴백 분홍이었고
+  // 배지는 투명 배경 + 흰 글자로 대비 1.4:1 이었다. 글 못 읽는 아이의 카드
+  // 식별자는 번호와 색뿐이다.
+  const cardCount = [...html.matchAll(/class="[^"]*mode-card/g)].length;
+  for (let index = 1; index <= cardCount; index += 1) {
+    assert.match(
+      css,
+      new RegExp(`\\.mode-card:nth-child\\(${index}\\)\\s*\\{[^}]*--card-color`, "s"),
+      `${index}번 카드 색이 없다`
+    );
+  }
+  assert.match(css, /\.card-number\s*\{[^}]*background:\s*var\(--card-accent,\s*#[0-9a-f]{6}\)/s,
+    "배지 배경에 폴백이 없으면 색 없는 카드에서 투명해진다");
+});
+
+test("키보드 포커스 링은 밝은 배경에서도 읽히는 진한 색이다", () => {
+  // P1-2: 흰 5px 링은 하늘색 배경·크림 카드 위에서 대비 1.0~1.5:1 이었다.
+  const focus = css.slice(css.indexOf("button:focus-visible"));
+  const block = focus.slice(0, focus.indexOf("}"));
+  assert.doesNotMatch(block, /outline:\s*\d+px\s+solid\s+#fff\b/,
+    "흰 아웃라인은 홈 배경에서 사라진다");
+  assert.match(block, /outline:\s*\d+px\s+solid\s+#25345d/);
+});
+
+test("지하철 목적지 픽커의 ⎵ 는 포커스된 카드를 먼저 본다", () => {
+  // P1-5: 무조건 가족 노선을 시작해, 홈에서 "화살표+⎵"를 배운 아이가 그대로
+  // 하면 2환승 최장 여정에 던져졌다.
+  const branch = app.slice(app.indexOf("state.subwayChoosing && (event.key"));
+  const body = branch.slice(0, branch.indexOf("// 물감 놀이"));
+  assert.match(body, /activeElement\?\.closest\?\.\("\[data-place-id\]"\)/);
+  assert.ok(
+    body.indexOf("startSubwayRide") < body.indexOf("startFamilyLine"),
+    "카드 선택이 가족 노선 단축키보다 먼저 와야 한다"
+  );
+});
+
+test("세기 캐릭터도 이미지가 깨지면 셀 수 있는 블록으로 물러난다", () => {
+  // P1-13: 그림이 곧 문제인 게임인데 유일하게 폴백이 없었다.
+  const fn = app.slice(app.indexOf("function countFriends("), app.indexOf("function resultBoard("));
+  assert.match(fn, /addEventListener\("error"/);
+  assert.match(fn, /quantityVisual\(value,\s*\{\s*countable:\s*true\s*\}\)/);
+});
+
+test("기관사 완주는 축하 단계로 넘어가 조작을 멈춘다", () => {
+  // P1-15: 이 한 곳만 setPhase 를 빠뜨려 9초 피날레 동안 phase 가 playing 이라
+  // ⎵ 가 계속 시뮬레이션에 들어갔다.
+  const fn = app.slice(
+    app.indexOf("function completeKtxJourney("), app.indexOf("function scheduleKtxTick("));
+  assert.match(fn, /setPhase\("celebrating"\)/);
+  assert.ok(fn.indexOf('setPhase("celebrating")') < fn.indexOf("goHome()"),
+    "홈 복귀 예약보다 먼저 단계를 넘겨야 한다");
+});

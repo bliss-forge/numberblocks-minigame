@@ -379,7 +379,14 @@ function countFriends(answer) {
   friends.className = "count-friends";
   friends.setAttribute("aria-label", `${answer}개`);
   countCharacterValues(answer).forEach(value => {
-    friends.append(character(value, "count-character"));
+    const image = character(value, "count-character");
+    // 이 게임은 그림이 곧 문제다. png 하나가 못 뜨면 셀 대상이 사라져 답을 낼 수
+    // 없다 — 곱하기·덧뺄셈·축하는 모두 폴백이 있는데 세기만 없었다(P1-13).
+    // 블록 네모로 물러나면 여전히 셀 수 있다.
+    image.addEventListener("error", () => {
+      image.replaceWith(quantityVisual(value, { countable: true }));
+    }, { once: true });
+    friends.append(image);
   });
   return friends;
 }
@@ -1086,7 +1093,11 @@ function playStationSound(station, followUpKey = null) {
     // 않게(감사 2026-08-06). 가족역은 폴백 키가 없어 예전처럼 조용히 지나간다.
     const nameKey = stationVoiceKey(station);
     if (nameKey && followUpKey) {
-      void audio.playPrompt(nameKey).then(() => void audio.playPrompt(followUpKey));
+      // 취소 확인 없이 이으면 뒤 음성이 도착 멜로디를 눌러 끈다 — 실음원 경로와
+      // 같은 규칙을 쓴다(심층 검토 P1-6, 국회의사당은 매 여정 재현).
+      void audio.playPrompt(nameKey).then(status => {
+        if (status !== "cancelled") void audio.playPrompt(followUpKey);
+      });
     } else if (nameKey) {
       void audio.playPrompt(nameKey);
     } else if (followUpKey) {
@@ -1388,6 +1399,9 @@ function completeKtxJourney(event) {
   // 빨간 cheer 배너는 피날레 제목과 같은 자리에 같은 말이 겹쳐 3중 표기가
   // 됐다(협회 후반 검수 6). 피날레 화면이 이미 제목·별 줄·친구 대열을
   // 갖고 있으니 배너 없이 9초 감상 후 홈으로.
+  // phase 를 넘기지 않으면 9초 동안 "playing" 이 유지돼 ⎵ 가 계속 시뮬레이션에
+  // 들어간다 — 다른 게임은 모두 축하 단계로 넘긴다(심층 검토 P1-15).
+  setPhase("celebrating");
   schedule(() => goHome(), 9000);
 }
 
@@ -2648,7 +2662,13 @@ document.addEventListener("keydown", event => {
     event.preventDefault();
     if (!event.repeat) {
       audio.playSfx("key");
-      startFamilyLine();
+      // 포커스가 목적지 카드에 있으면 그 카드를 고른다. 무조건 가족 노선을
+      // 시작하면, 홈에서 "화살표로 고르고 ⎵" 를 방금 배운 아이가 그대로 했을 때
+      // 엉뚱한 2환승 최장 여정에 던져진다(심층 검토 P1-5). 가족 노선은 카드에
+      // 포커스가 없을 때의 단축키로만 남긴다.
+      const focusedPlace = document.activeElement?.closest?.("[data-place-id]");
+      if (focusedPlace) startSubwayRide(focusedPlace.dataset.placeId);
+      else startFamilyLine();
     }
     return;
   }

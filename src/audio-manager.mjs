@@ -180,14 +180,18 @@ export class AudioManager {
     await this.playFile(VOICE[key]?.[language], epoch);
   }
 
+  // 상태를 돌려준다 — 호출부가 "밀렸는지"를 알아야 후속 음성을 이을지 판단할 수
+  // 있다. 반환이 없던 동안 지하철 폴백 경로가 취소를 모르고 후속을 이어 도착
+  // 멜로디를 눌러 껐다(심층 검토 P1-6). 실음원 경로는 이미 상태를 보고 있었다.
   async playPrompt(key) {
     const epoch = this.epoch;
     const entry = VOICE[key];
     const first = await this.playFile(entry?.ko, epoch);
     // 한국어가 다른 낭독에 밀렸으면 영어를 잇지 않는다 — 이으면 새로 시작한
     // 안내를 영어가 덮어써서 정작 들려줘야 할 문장이 잘린다.
-    if (first === "cancelled") return;
-    if (entry?.en) await this.playFile(entry.en, epoch);
+    if (first === "cancelled") return "cancelled";
+    if (entry?.en) return await this.playFile(entry.en, epoch);
+    return first;
   }
 
   async playAnswer(number) {

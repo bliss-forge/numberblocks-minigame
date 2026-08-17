@@ -47,8 +47,12 @@ button {
 }
 
 button:focus-visible {
-  outline: 5px solid #fff;
-  outline-offset: 4px;
+  /* 흰 링은 하늘색 배경·크림색 카드·흰 알약 위에서 대비 1.0~1.5:1 로 사실상
+     안 보였다(심층 검토 P1-2). 방향키 탐색의 1차 피드백이라 진한 링 + 흰 후광
+     이중으로 둬서 어느 배경에서도 읽히게 한다. */
+  outline: 4px solid #25345d;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 8px rgba(255, 255, 255, .95);
 }
 
 .world,
@@ -481,7 +485,9 @@ kbd {
   font-family: var(--display-font);
   font-size: 27px;
   font-weight: 900;
-  background: var(--card-accent);
+  /* 폴백 없이 var 만 쓰면 색이 정의되지 않은 카드에서 배경이 투명해져
+     흰 글자만 남는다(심층 검토 P1-1). */
+  background: var(--card-accent, #25345d);
   box-shadow: 0 5px 0 rgba(37, 52, 93, .14);
 }
 
@@ -1927,6 +1933,27 @@ body[data-state="home"] .mode-card img {
   transform: translateY(-6px) rotate(-.6deg);
 }
 
+/* 7~9번은 카드가 늘어날 때 색 정의가 따라오지 않아 셋 다 폴백 분홍이었고,
+   배지도 투명 배경 + 흰 숫자로 대비 1.4:1까지 떨어졌다(심층 검토 P1-1).
+   글 못 읽는 아이에게 카드 식별자는 번호와 색뿐이다. */
+.mode-card:nth-child(7) {
+  --card-color: #cfe6fb;
+  --card-accent: #2f6f9f;
+  transform: rotate(.7deg);
+}
+
+.mode-card:nth-child(8) {
+  --card-color: #fbd3e4;
+  --card-accent: #b4356f;
+  transform: translateY(-5px) rotate(-.8deg);
+}
+
+.mode-card:nth-child(9) {
+  --card-color: #d5eddd;
+  --card-accent: #2f7d55;
+  transform: rotate(-.5deg);
+}
+
 .card-copy strong,
 .card-copy small {
   word-break: keep-all;
@@ -3297,6 +3324,14 @@ body[data-mode="safety"] .stage-lights {
   body[data-mode="safety"] #game {
     gap: 4px;
     padding: 48px 1.5vw 6px;
+  }
+
+  /* 좁힌 상단 여백은 7×5 지도를 크게 쓰기 위한 계약이다(테스트가 고정).
+     그래서 배너를 내리는 대신 별 알약을 중앙에서 비킨다 — HUD 가운데에 있던
+     알약이 미션 문구 한가운데를 상시 가렸다(심층 검토 P1-8, 겹침 24×87px). */
+  body[data-mode="safety"] .star-pill {
+    margin-left: auto;
+    margin-right: 12px;
   }
 
   body[data-mode="safety"] .problem-pill {
