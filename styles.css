@@ -11028,16 +11028,6 @@ body[data-mode="catchmind"] .stage-lights {
   gap: 12px;
 }
 
-.cm-stage {
-  padding: 6px 14px;
-  border: 2px solid #3e8ed0;
-  border-radius: 999px;
-  background: #e8f2fb;
-  color: #2b6ca3;
-  font-size: 18px;
-  font-weight: 900;
-}
-
 .cm-dots {
   display: flex;
   gap: 8px;
@@ -11136,6 +11126,24 @@ body[data-mode="catchmind"] .stage-lights {
   font-weight: 900;
 }
 
+.cm-hint-pips {
+  display: flex;
+  gap: 4px;
+}
+
+.cm-hint-pip {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #f8c825;
+  border: 1px solid #c9a132;
+}
+
+.cm-hint-pip.used {
+  background: #e0d8c6;
+  border-color: #d9cfb0;
+}
+
 .cm-frame {
   position: relative;
   height: 100%;
@@ -11193,27 +11201,6 @@ body[data-mode="catchmind"] .stage-lights {
   position: relative;
   width: min(92%, 560px);
   margin: 0 auto;
-  padding-top: 18px;
-}
-
-.cm-gauge-zone {
-  position: absolute;
-  top: 0;
-  color: #c9a132;
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 1px;
-  text-align: center;
-}
-
-.cm-gauge-zone-three {
-  left: 0;
-  width: 50%;
-}
-
-.cm-gauge-zone-two {
-  left: 50%;
-  width: 50%;
 }
 
 .cm-gauge-track {
@@ -11230,16 +11217,6 @@ body[data-mode="catchmind"] .stage-lights {
   width: 0%;
   border-radius: 8px;
   background: #5c8cb8;
-}
-
-.cm-gauge-mark {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  border-radius: 2px;
-  background: #8a7b63;
 }
 
 .cm-cards {
@@ -11523,11 +11500,6 @@ body[data-mode="catchmind"] .stage-lights {
 
   .cm-chip-label {
     display: none;
-  }
-
-  .cm-stage {
-    padding: 4px 10px;
-    font-size: 15px;
   }
 
   .cm-board {

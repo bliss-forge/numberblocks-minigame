@@ -14,7 +14,7 @@ test("정적 셸이 스타일과 앱 모듈을 로드한다", () => {
 
 test("1~5 모바일 보정 스타일은 기본 스타일 뒤에 로드된다", () => {
   const baseIndex = html.indexOf(
-    'href="styles.css?v=20260819-stage"'
+    'href="styles.css?v=20260819-hint5"'
   );
   const mobileIndex = html.indexOf(
     'href="mobile-games.css?v=20260808-delivery-home"'
@@ -28,7 +28,7 @@ test("스타일 시트는 최신 캐시 주소를 달고 나간다", () => {
   // 배포 후 옛 CSS 가 그대로 쓰이지 않도록, 내용이 바뀌면 이 값을 함께 올린다.
   assert.match(
     html,
-    /<link rel="stylesheet" href="styles\.css\?v=20260819-stage">/
+    /<link rel="stylesheet" href="styles\.css\?v=20260819-hint5">/
   );
   assert.match(
     html,

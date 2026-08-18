@@ -2480,7 +2480,7 @@ let catchmindStage = Math.max(
 );
 
 function catchmindCaption() {
-  return `${state.catchmind.stage}단계 — 슥삭이가 무엇을 그리는 걸까요?`;
+  return "슥삭이가 무엇을 그리는 걸까요?";
 }
 
 function renderCatchmindStage() {
@@ -2513,7 +2513,7 @@ function startCatchmind(stage = catchmindStage) {
   renderCatchmindStage();
   setPhase("playing");
   audio.playSfx("jingle");
-  showHint("슥삭이가 무엇을 그리는지 맞혀 봐요! 숫자 1~4로 골라요");
+  showHint("조금만 보고 맞히면 별 3개! 모르겠으면 힌트를 눌러요");
   scheduleCatchmindTick();
 }
 
@@ -2524,7 +2524,7 @@ function scheduleCatchmindTick(previousMs = performance.now()) {
     // 탭이 숨겨졌던 시간은 별 판정·힌트 타이머에 넣지 않는다(상한 200ms).
     const delta = Math.min(200, nowMs - previousMs);
     const model = state.catchmind;
-    if (model.phase === "reveal" || model.phase === "wait") {
+    if (model.phase === "drawing" || model.phase === "guess") {
       handleCatchmindEvents(tickCatchmind(model, delta));
       if (state.catchmind === model) {
         if (state.catchmindReveal) {
@@ -2542,18 +2542,21 @@ function scheduleCatchmindTick(previousMs = performance.now()) {
 function handleCatchmindEvents(events) {
   for (const event of events) {
     switch (event.type) {
-      case "reveal-done":
+      case "step-done":
+        // 한 단계를 다 그리고 펜을 내려놓는 작은 신호.
+        if (!event.complete) audio.playSfx("key");
         break;
       case "hint":
         audio.playSfx("pop");
         showHint(
-          event.level >= 3
-            ? "반짝이는 카드를 눌러 봐요!"
-            : "아닌 그림 하나를 지웠어요!"
+          event.remaining > 0
+            ? `슥삭이가 조금 더 그려요! 힌트 ${event.remaining}번 남았어요`
+            : "마지막 힌트! 그림을 끝까지 그려 줄게요"
         );
         break;
-      case "hint-pulse":
+      case "rescue-pulse":
         audio.playSfx("bell");
+        showHint("반짝이는 카드를 눌러 봐요!");
         break;
       case "wrong": {
         audio.playSfx("wrong");
@@ -2639,7 +2642,7 @@ function showCatchmindResult() {
   const scene = renderCatchmindResult(document, model, catchmindBest);
   state.catchmindScene = scene;
   dom.stage.replaceChildren(scene);
-  dom.problem.textContent = `${model.stage}단계 완료! 별 ${model.totalStars}개`;
+  dom.problem.textContent = `다 맞혔어요! 별 ${model.totalStars}개`;
   audio.playSfx("jingle");
   scene.querySelector("[data-cm-action='next']")?.focus?.();
 }

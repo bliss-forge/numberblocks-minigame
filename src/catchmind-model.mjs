@@ -1,28 +1,35 @@
 // 슥삭 그림 퀴즈 — 순수 게임 로직. DOM·오디오·시간을 모른다.
 //
-// 규칙 출처: catchmind-game-design.md (2026-08-18 final)
-// - 1판 = 5라운드, 실패·타임오버 없음. 라운드당 별 3/2/1.
-// - 별은 절대 시간 기준: 첫 시도(오답 0·H2 미사용)로 재생 시간의 50% 안에
-//   맞히면 ★3, 재생 종료 +1초 안(H3 미사용)이면 ★2, 그 외 언제 맞혀도 ★1.
-// - 힌트는 오답 카드 제거 3단계(H1 한 장 → H2 50:50 → H3 정답 펄스).
-//   버튼은 재생 시작 +3초부터, 자동 발동은 재생 종료 후 +8/16/28초,
-//   H3는 이후 10초마다 반복 펄스.
-// - 오답 카드는 라운드 내 영구 비활성 — 선택지가 좁혀져 반드시 성공한다.
+// 공개 방식(2026-08-19 사용자 지시): 그림은 단계로 그려진다.
+// - 라운드가 시작되면 1단계 — 큰 윤곽(전체 선 길이의 25%)만 그리고 멈춘다.
+//   (지도라면 네모부터.) 아이는 그 상태에서 바로 맞혀도 된다.
+// - 힌트 1번 = 다음 단계를 마저 그린다(25→40→55→70→85→100%). 힌트는 5번.
+// - 가만히 있으면 일정 시간마다 자동으로 다음 단계를 그려 준다(막힌 아이
+//   구제 — 자동도 힌트 5번에 포함). 5번을 다 쓰고도 못 고르면 정답 카드가
+//   주기적으로 반짝인다. 실패·타임오버는 없다.
+// - 별은 시간이 아니라 힌트 수로 판정: 한 번에 정답 + 힌트 ≤1 = ★3,
+//   힌트 ≤3 = ★2, 그 외 = ★1. 오답 카드는 라운드 내 영구 비활성.
 //
-// 문서와 다른 점(이모지 방식 채택에 따른 의도적 단순화):
+// 설계 문서(catchmind-game-design.md)와 다른 점:
+// - 시간 기반 별 판정·오답 제거 힌트 3단계를 폐기하고 위 단계 공개로 대체.
 // - 오답 3개는 저작 고정 목록 대신 같은 카테고리에서 시드 난수로 뽑는다.
-//   이모지는 선화와 달리 오독 소지가 없어 금지쌍 테이블이 필요 없다.
-// - 연령 2모드·홈 난이도 대신 단계 진행(1단계→2단계→…)이 난이도를 정한다.
+// - 판마다 서서히 어려워지는 램프(stagePlan)는 내부에만 있고 화면에 단계
+//   숫자를 쓰지 않는다 — "단계"라는 말은 그림 공개 단계에만 쓴다.
 
 import { CATCHMIND_ITEMS } from "./catchmind-data.mjs";
 
 export const CATCHMIND_ROUNDS = 5;
 
-// 단계 진행(2026-08-19 사용자 지시: "1단계, 2단계, 3단계 식으로").
-// 한 단계 = 그림 5개. 단계가 오를수록 문항 레벨이 어려워지고 그리기가
-// 빨라진다. 5단계에서 상한 — 이후는 같은 난이도로 끝없이 이어진다.
-// 실패가 없으므로 단계는 언제나 완료되고, 다음 단계로만 나아간다.
-// 이 게임은 홈 난이도(쉬움/차근차근/도전) 대신 단계가 난이도를 정한다.
+// 그림 공개 단계 — 시작하면 [0]까지 그리고 멈춘다. 힌트 n번째 = [n]까지.
+export const STEP_FRACTIONS = Object.freeze([0.25, 0.4, 0.55, 0.7, 0.85, 1]);
+export const CATCHMIND_HINT_MAX = STEP_FRACTIONS.length - 1; // 5
+// 멈춘 채 이 시간이 지나면 자동으로 다음 단계를 그려 준다.
+export const AUTO_HINT_IDLE_MS = 10000;
+// 힌트 소진 후 이 주기로 정답 카드를 반짝여 준다.
+export const RESCUE_PULSE_MS = 10000;
+
+// 판 램프(내부 전용) — 판을 거듭할수록 문항 레벨이 어려워지고 그리기가
+// 빨라진다. 5판째에서 상한 — 이후는 같은 난이도로 끝없이 이어진다.
 const STAGE_PLANS = Object.freeze([
   Object.freeze({ levels: Object.freeze([1, 1, 1, 1, 1]), durationScale: 1.3 }),
   Object.freeze({ levels: Object.freeze([1, 1, 1, 2, 2]), durationScale: 1.15 }),
@@ -41,13 +48,10 @@ export function stagePlan(stage) {
   return STAGE_PLANS[index];
 }
 
-// 레벨별 기준 공개 시간(ms). 문서의 T1=6000/T2=8000/T3=10000을 따른다.
+// 레벨별 전체 그림 소요 시간(ms). 문서의 T1=6000/T2=8000/T3=10000을 따른다.
+// 단계 공개에서는 "쉬지 않고 다 그렸을 때" 걸리는 시간이고, 실제로는
+// 단계 경계에서 멈추므로 한 단계는 이 시간의 15~25%씩이다.
 const BASE_REVEAL_MS = Object.freeze([6000, 8000, 10000]);
-
-// 힌트 자동 발동 타임라인(공개 종료 뒤 경과 ms)과 H3 반복 주기.
-export const HINT_AUTO_MS = Object.freeze([8000, 16000, 28000]);
-export const HINT_REPEAT_MS = 10000;
-export const HINT_BUTTON_READY_MS = 3000;
 
 // mulberry32 — 시드 고정 재현용 난수(문서 §8-5).
 export function mulberry32(seed) {
@@ -136,15 +140,16 @@ export function createCatchmind(stage, seed = 1, options = {}) {
     rng,
     rounds,
     roundIndex: 0,
-    phase: "reveal", // reveal → wait → celebrate → (다음 라운드 | result)
-    elapsedMs: 0,
+    // drawing(단계를 그리는 중) → guess(멈추고 대기) → celebrate → result
+    phase: "drawing",
+    revealFraction: 0,
+    revealTarget: STEP_FRACTIONS[0],
     revealMs: 0,
+    hintsUsed: 0,
+    idleMs: 0,
+    rescue: false,
     wrong: [],
-    hintLevel: 0,
-    hintUsedH2: false,
-    hintUsedH3: false,
     firstTry: true,
-    nextPulseMs: 0,
     starsEarned: [],
     totalStars: 0
   };
@@ -154,15 +159,15 @@ export function createCatchmind(stage, seed = 1, options = {}) {
 
 function resetRound(model) {
   const round = model.rounds[model.roundIndex];
-  model.phase = "reveal";
-  model.elapsedMs = 0;
+  model.phase = "drawing";
+  model.revealFraction = 0;
+  model.revealTarget = STEP_FRACTIONS[0];
   model.revealMs = revealDurationMs(round.item, model.stage);
+  model.hintsUsed = 0;
+  model.idleMs = 0;
+  model.rescue = false;
   model.wrong = [];
-  model.hintLevel = 0;
-  model.hintUsedH2 = false;
-  model.hintUsedH3 = false;
   model.firstTry = true;
-  model.nextPulseMs = 0;
 }
 
 export function currentCatchmindRound(model) {
@@ -170,85 +175,88 @@ export function currentCatchmindRound(model) {
 }
 
 export function revealFraction(model) {
-  return Math.min(1, model.elapsedMs / model.revealMs);
+  return model.revealFraction;
+}
+
+export function hintsRemaining(model) {
+  return CATCHMIND_HINT_MAX - model.hintsUsed;
 }
 
 // 지금 맞히면 얻는 별 수 — 라이브 인디케이터와 판정이 같은 함수를 쓴다.
+// 시간 압박 없음: 힌트를 얼마나 썼는지(그림을 얼마나 보여 달라고 했는지)와
+// 한 번에 맞혔는지만 본다.
 export function starsIfNow(model) {
-  if (!model.hintUsedH3) {
-    if (
-      model.firstTry &&
-      !model.hintUsedH2 &&
-      model.elapsedMs <= model.revealMs * 0.5
-    ) {
-      return 3;
-    }
-    if (model.elapsedMs <= model.revealMs + 1000) return 2;
-  }
+  if (model.firstTry && model.hintsUsed <= 1) return 3;
+  if (model.hintsUsed <= 3) return 2;
   return 1;
 }
 
 export function hintButtonReady(model) {
-  if (model.phase !== "reveal" && model.phase !== "wait") return false;
-  if (model.elapsedMs < HINT_BUTTON_READY_MS) return false;
-  if (model.hintLevel >= 3) return false;
-  // H3(정답 알려주기)는 공개가 끝난 뒤에만 — 그리는 도중 정답 공개는 김빠진다.
-  if (model.hintLevel === 2 && model.phase !== "wait") return false;
-  return true;
+  return model.phase === "guess" && model.hintsUsed < CATCHMIND_HINT_MAX;
 }
 
-function fireHint(model) {
-  const level = model.hintLevel + 1;
-  model.hintLevel = level;
-  if (level === 3) {
-    model.hintUsedH3 = true;
-    model.nextPulseMs = model.elapsedMs + HINT_REPEAT_MS;
-    return [{ type: "hint", level, removedIndex: null }];
-  }
-  if (level === 2) model.hintUsedH2 = true;
-  const round = currentCatchmindRound(model);
-  const candidates = round.cards
-    .map((card, index) => index)
-    .filter(
-      index => index !== round.answerIndex && !model.wrong.includes(index)
-    );
-  if (candidates.length === 0) return [{ type: "hint", level, removedIndex: null }];
-  const removedIndex = pickItem(candidates, model.rng);
-  model.wrong.push(removedIndex);
-  return [{ type: "hint", level, removedIndex }];
+function fireHint(model, auto) {
+  model.hintsUsed += 1;
+  model.revealTarget =
+    STEP_FRACTIONS[Math.min(model.hintsUsed, STEP_FRACTIONS.length - 1)];
+  model.phase = "drawing";
+  model.idleMs = 0;
+  return [
+    {
+      type: "hint",
+      used: model.hintsUsed,
+      remaining: hintsRemaining(model),
+      auto
+    }
+  ];
 }
 
 export function useCatchmindHint(model) {
   if (!hintButtonReady(model)) return [];
-  return fireHint(model);
+  return fireHint(model, false);
 }
 
 // 매 프레임 진행 — deltaMs는 호출부가 탭 은닉 대비로 상한을 걸어 넘긴다.
 export function tickCatchmind(model, deltaMs) {
-  if (model.phase !== "reveal" && model.phase !== "wait") return [];
-  const events = [];
-  model.elapsedMs += deltaMs;
-
-  if (model.phase === "reveal" && model.elapsedMs >= model.revealMs) {
-    model.phase = "wait";
-    events.push({ type: "reveal-done" });
+  if (model.phase === "drawing") {
+    model.revealFraction = Math.min(
+      model.revealTarget,
+      model.revealFraction + deltaMs / model.revealMs
+    );
+    if (model.revealFraction >= model.revealTarget - 1e-9) {
+      // 부동소수 누적 오차를 잘라 정확히 목표에 앉힌다 — 마지막 단계에서
+      // 1.0에 못 미치면 장면 쪽 완성 판정(fraction >= 1)이 어긋난다.
+      model.revealFraction = model.revealTarget;
+      model.phase = "guess";
+      model.idleMs = 0;
+      return [
+        {
+          type: "step-done",
+          step: model.hintsUsed + 1,
+          complete: model.revealTarget >= 1
+        }
+      ];
+    }
+    return [];
   }
 
-  if (model.phase === "wait") {
-    const sinceDone = model.elapsedMs - model.revealMs;
-    while (model.hintLevel < 3 && sinceDone >= HINT_AUTO_MS[model.hintLevel]) {
-      events.push(...fireHint(model));
-    }
-    if (model.hintLevel >= 3 && model.elapsedMs >= model.nextPulseMs) {
-      model.nextPulseMs = model.elapsedMs + HINT_REPEAT_MS;
-      events.push({ type: "hint-pulse" });
-    }
+  if (model.phase !== "guess") return [];
+
+  model.idleMs += deltaMs;
+  if (model.hintsUsed < CATCHMIND_HINT_MAX) {
+    if (model.idleMs >= AUTO_HINT_IDLE_MS) return fireHint(model, true);
+    return [];
   }
-  return events;
+  if (model.idleMs >= RESCUE_PULSE_MS) {
+    model.idleMs = 0;
+    model.rescue = true;
+    return [{ type: "rescue-pulse" }];
+  }
+  return [];
 }
 
 export function guessCatchmindCard(model, cardIndex) {
-  if (model.phase !== "reveal" && model.phase !== "wait") return [];
+  if (model.phase !== "drawing" && model.phase !== "guess") return [];
   const round = currentCatchmindRound(model);
   if (cardIndex < 0 || cardIndex >= round.cards.length) return [];
   if (model.wrong.includes(cardIndex)) return [];
@@ -256,6 +264,7 @@ export function guessCatchmindCard(model, cardIndex) {
   if (cardIndex !== round.answerIndex) {
     model.wrong.push(cardIndex);
     model.firstTry = false;
+    model.idleMs = 0;
     return [{ type: "wrong", index: cardIndex }];
   }
 

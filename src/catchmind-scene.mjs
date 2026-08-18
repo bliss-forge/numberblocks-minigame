@@ -15,8 +15,10 @@ import {
   CATCHMIND_ITEMS
 } from "./catchmind-data.mjs";
 import {
+  CATCHMIND_HINT_MAX,
   CATCHMIND_ROUNDS,
   hintButtonReady,
+  hintsRemaining,
   revealFraction,
   starsIfNow
 } from "./catchmind-model.mjs";
@@ -209,7 +211,6 @@ export function renderCatchmindRound(document, model) {
   root.dataset.cmPhase = model.phase;
 
   const top = el(document, "div", "cm-top");
-  const stageBadge = el(document, "span", "cm-stage", `${model.stage}단계`);
   const dots = el(document, "div", "cm-dots");
   dots.setAttribute("aria-label", `${CATCHMIND_ROUNDS}판 중 ${model.roundIndex + 1}번째 그림`);
   for (let i = 0; i < CATCHMIND_ROUNDS; i += 1) {
@@ -226,14 +227,20 @@ export function renderCatchmindRound(document, model) {
     el(document, "span", "cm-chip-icon", category.icon),
     el(document, "span", "cm-chip-label", category.label)
   );
-  top.append(stageBadge, dots, chip, live);
+  top.append(dots, chip, live);
 
   const board = el(document, "div", "cm-board");
   const hint = el(document, "button", "cm-hint", "💡");
   hint.type = "button";
   hint.dataset.cmHint = "1";
   hint.append(el(document, "span", "cm-hint-label", "힌트"));
-  hint.setAttribute("aria-label", "힌트 — 아닌 그림 카드를 지워요");
+  // 남은 힌트 5개를 점으로 — 글을 못 읽어도 몇 번 남았는지 보인다.
+  const pips = el(document, "span", "cm-hint-pips");
+  for (let i = 0; i < CATCHMIND_HINT_MAX; i += 1) {
+    pips.append(el(document, "i", "cm-hint-pip"));
+  }
+  hint.append(pips);
+  hint.setAttribute("aria-label", "힌트 — 슥삭이가 그림을 더 그려 줘요");
 
   const frame = el(document, "div", "cm-frame");
   frame.setAttribute("role", "img");
@@ -247,14 +254,12 @@ export function renderCatchmindRound(document, model) {
 
   board.append(hint, frame);
 
+  // 얼마나 그려졌는지 보여 주는 진행 막대 — 별 판정과는 무관한 순수 정보.
   const gauge = el(document, "div", "cm-gauge");
   const track = el(document, "div", "cm-gauge-track");
   const fill = el(document, "div", "cm-gauge-fill");
-  const mark = el(document, "span", "cm-gauge-mark");
-  const zoneThree = el(document, "span", "cm-gauge-zone cm-gauge-zone-three", "★★★");
-  const zoneTwo = el(document, "span", "cm-gauge-zone cm-gauge-zone-two", "★★");
-  track.append(fill, mark);
-  gauge.append(zoneThree, zoneTwo, track);
+  track.append(fill);
+  gauge.append(track);
 
   const cardsRow = el(document, "div", "cm-cards");
   round.cards.forEach((card, index) => {
@@ -412,6 +417,10 @@ export function updateCatchmindScene(scene, model) {
     const ready = hintButtonReady(model);
     hint.disabled = !ready;
     hint.setAttribute("aria-disabled", String(!ready));
+    const remaining = hintsRemaining(model);
+    hint.querySelectorAll(".cm-hint-pip").forEach((pip, index) => {
+      pip.classList.toggle("used", index >= remaining);
+    });
   }
 
   scene.querySelectorAll(".cm-dot").forEach((dot, index) => {
@@ -427,7 +436,7 @@ export function updateCatchmindScene(scene, model) {
     if (model.phase !== "celebrate") {
       card.classList.toggle(
         "pulse",
-        model.hintLevel >= 3 && index === round.answerIndex
+        model.rescue && index === round.answerIndex
       );
     }
   });
@@ -457,12 +466,7 @@ export function showCatchmindCelebrate(scene, item, stars) {
 // ── 결과 화면 ──────────────────────────────────────────────────────────────
 export function renderCatchmindResult(document, model, best) {
   const root = el(document, "div", "cm-root cm-result");
-  const title = el(
-    document,
-    "h2",
-    "cm-result-title",
-    `${model.stage}단계 완료! 참 잘했어요!`
-  );
+  const title = el(document, "h2", "cm-result-title", "참 잘했어요!");
 
   const total = el(document, "div", "cm-result-total");
   total.append(
@@ -488,7 +492,7 @@ export function renderCatchmindResult(document, model, best) {
 
   const actions = el(document, "div", "cm-actions");
   for (const [action, label, icon] of [
-    ["next", `${model.stage + 1}단계 가기`, "▶"],
+    ["next", "또 하기", "🔄"],
     ["collection", "그림 도감", "📖"],
     ["home", "처음으로", "🏠"]
   ]) {
