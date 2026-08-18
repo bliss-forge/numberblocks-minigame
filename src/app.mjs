@@ -160,6 +160,24 @@ import {
   tickRhythm
 } from "./delivery-model.mjs";
 import { deliveryCaption, renderDelivery } from "./delivery-scene.mjs";
+import {
+  advanceCatchmind,
+  createCatchmind,
+  currentCatchmindRound,
+  guessCatchmindCard,
+  revealFraction,
+  tickCatchmind,
+  useCatchmindHint
+} from "./catchmind-model.mjs";
+import {
+  paintCatchmindReveal,
+  renderCatchmindCollection,
+  renderCatchmindResult,
+  renderCatchmindRound,
+  setupCatchmindReveal,
+  showCatchmindCelebrate,
+  updateCatchmindScene
+} from "./catchmind-scene.mjs";
 
 const WALK_REPEAT_MS = 110;
 const audio = new AudioManager();
@@ -218,6 +236,12 @@ const state = {
   deliveryBusy: false,   // 주행 연출·도착 여운 동안 입력 잠금
   deliveryLastStepAt: 0, // 방향키 반복을 5번 게임과 같은 간격으로 조인다
   paintFinaleAt: 0,   // 피날레 화면이 뜬 시각(최소 체류 계산용)
+  catchmind: null,
+  catchmindScene: null,
+  catchmindReveal: null,  // 캔버스 붓칠 상태 — 브라우저에서만 존재
+  catchmindBusy: false,   // 정답 축하 연출 동안 입력 잠금
+  catchmindView: "game",  // game | result | collection
+  catchmindTab: "animal",
   wrongCount: 0,
   round: 0,
   hintTimer: 0,
@@ -2415,6 +2439,238 @@ function deliveryBell() {
   }
 }
 
+// ── 슥삭 그림 퀴즈 ────────────────────────────────────────────────────────
+// 슥삭이(붓)가 이모지 그림을 붓칠로 서서히 공개하고, 아이가 카드 4장에서
+// 정답을 고른다. 규칙·별 판정은 catchmind-model.mjs, 화면은 catchmind-scene.mjs.
+
+// 저장은 한 번 읽어 메모리에 들고 쓰기만 시도한다 — localStorage 가 막힌
+// 환경(사파리 프라이빗)에서도 판 안에서는 정상 동작한다(문서 §9-2-6).
+function catchmindRead(key, fallback) {
+  try {
+    const raw = globalThis.localStorage?.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function catchmindWrite(key, value) {
+  try {
+    globalThis.localStorage?.setItem(key, JSON.stringify(value));
+  } catch {
+    // 메모리 사본이 진실 — 저장 실패는 조용히 넘긴다
+  }
+}
+
+let catchmindRecent = Array.isArray(catchmindRead("nbmg.catchmind.recent", []))
+  ? catchmindRead("nbmg.catchmind.recent", [])
+  : [];
+const catchmindCollected = new Set(
+  Array.isArray(catchmindRead("nbmg.catchmind.collected", []))
+    ? catchmindRead("nbmg.catchmind.collected", [])
+    : []
+);
+let catchmindBest = Number(catchmindRead("nbmg.catchmind.best", 0)) || 0;
+
+function catchmindCaption() {
+  return `슥삭이가 그림을 그려요 — ${state.catchmind.roundIndex + 1}번째 그림`;
+}
+
+function renderCatchmindStage() {
+  const scene = renderCatchmindRound(document, state.catchmind);
+  state.catchmindScene = scene;
+  dom.stage.replaceChildren(scene);
+  state.catchmindReveal = setupCatchmindReveal(
+    scene,
+    currentCatchmindRound(state.catchmind).item
+  );
+  dom.problem.textContent = catchmindCaption();
+  updateCatchmindScene(scene, state.catchmind);
+}
+
+function startCatchmind() {
+  stopSafetyHold();
+  clearTimers(); // "다시 하기" 재진입 시 이전 틱 체인이 겹돌지 않게 먼저 끊는다
+  audio.cancel();
+  state.round += 1;
+  state.problem = null;
+  state.buffer = "";
+  state.catchmind = createCatchmind(state.difficulty, Date.now() >>> 0, {
+    recent: catchmindRecent
+  });
+  state.catchmindBusy = false;
+  state.catchmindView = "game";
+  dom.cheer.classList.remove("show");
+  dom.hint.className = "toast";
+  dom.hint.textContent = "";
+  renderCatchmindStage();
+  setPhase("playing");
+  audio.playSfx("jingle");
+  showHint("슥삭이가 무엇을 그리는지 맞혀 봐요! 숫자 1~4로 골라요");
+  scheduleCatchmindTick();
+}
+
+function scheduleCatchmindTick(previousMs = performance.now()) {
+  schedule(() => {
+    if (state.mode !== "catchmind" || !state.catchmind) return;
+    const nowMs = performance.now();
+    // 탭이 숨겨졌던 시간은 별 판정·힌트 타이머에 넣지 않는다(상한 200ms).
+    const delta = Math.min(200, nowMs - previousMs);
+    const model = state.catchmind;
+    if (model.phase === "reveal" || model.phase === "wait") {
+      handleCatchmindEvents(tickCatchmind(model, delta));
+      if (state.catchmind === model) {
+        if (state.catchmindReveal) {
+          paintCatchmindReveal(state.catchmindReveal, revealFraction(model));
+        }
+        if (state.catchmindScene) {
+          updateCatchmindScene(state.catchmindScene, model);
+        }
+      }
+    }
+    scheduleCatchmindTick(nowMs);
+  }, 33);
+}
+
+function handleCatchmindEvents(events) {
+  for (const event of events) {
+    switch (event.type) {
+      case "reveal-done":
+        break;
+      case "hint":
+        audio.playSfx("pop");
+        showHint(
+          event.level >= 3
+            ? "반짝이는 카드를 눌러 봐요!"
+            : "아닌 그림 하나를 지웠어요!"
+        );
+        break;
+      case "hint-pulse":
+        audio.playSfx("bell");
+        break;
+      case "wrong": {
+        audio.playSfx("wrong");
+        const card = state.catchmindScene?.querySelector(
+          `[data-cm-card="${event.index}"]`
+        );
+        if (card) replayClass(card, "shake");
+        showHint("괜찮아요! 다른 그림을 골라 봐요");
+        break;
+      }
+      case "correct":
+        startCatchmindCelebrate(event);
+        break;
+    }
+  }
+}
+
+function startCatchmindCelebrate({ stars, item }) {
+  const model = state.catchmind;
+  state.catchmindBusy = true;
+  audio.cancel();
+  // 오답 직후의 "괜찮아요" 토스트가 축하 화면까지 남지 않게 지운다.
+  dom.hint.className = "toast";
+  dom.hint.textContent = "";
+  audio.playSfx("win");
+  state.stars += stars;
+  dom.stars.textContent = String(state.stars);
+  if (state.catchmindReveal) paintCatchmindReveal(state.catchmindReveal, 1);
+  showCatchmindCelebrate(state.catchmindScene, item, stars);
+  updateCatchmindScene(state.catchmindScene, model);
+  dom.problem.textContent = `정답! ${item.n}`;
+
+  // 도감 수집 + 최근 출제 큐(다음 판 중복 방지, 최근 40개)
+  catchmindCollected.add(item.n);
+  catchmindWrite("nbmg.catchmind.collected", [...catchmindCollected]);
+  catchmindRecent = [...catchmindRecent, item.n].slice(-40);
+  catchmindWrite("nbmg.catchmind.recent", catchmindRecent);
+
+  for (let i = 0; i < stars; i += 1) {
+    schedule(() => audio.playSfx("bell"), 500 + i * 220);
+  }
+  schedule(() => {
+    if (state.catchmind !== model) return;
+    for (const event of advanceCatchmind(model)) {
+      if (event.type === "round") {
+        state.catchmindBusy = false;
+        audio.playSfx("jingle");
+        renderCatchmindStage();
+      } else if (event.type === "result") {
+        showCatchmindResult();
+      }
+    }
+  }, 2200);
+}
+
+function showCatchmindResult() {
+  const model = state.catchmind;
+  state.catchmindBusy = false;
+  state.catchmindView = "result";
+  state.catchmindReveal = null;
+  if (model.totalStars > catchmindBest) {
+    catchmindBest = model.totalStars;
+    catchmindWrite("nbmg.catchmind.best", catchmindBest);
+  }
+  const scene = renderCatchmindResult(document, model, catchmindBest);
+  state.catchmindScene = scene;
+  dom.stage.replaceChildren(scene);
+  dom.problem.textContent = `다 그렸어요! 별 ${model.totalStars}개`;
+  audio.playSfx("jingle");
+  scene.querySelector("[data-cm-action='again']")?.focus?.();
+}
+
+function showCatchmindCollection(tab = state.catchmindTab) {
+  state.catchmindView = "collection";
+  state.catchmindTab = tab;
+  const scene = renderCatchmindCollection(document, catchmindCollected, tab);
+  state.catchmindScene = scene;
+  dom.stage.replaceChildren(scene);
+  dom.problem.textContent = "그림 도감 — 맞힌 그림이 모여요";
+  scene.querySelector(".cm-tab.active")?.focus?.();
+}
+
+function catchmindGuess(index) {
+  if (!state.catchmind || state.catchmindBusy) return;
+  const events = guessCatchmindCard(state.catchmind, index);
+  if (events.length === 0) return; // 비활성 카드 — 무반응(문서 §6-4)
+  handleCatchmindEvents(events);
+  if (state.catchmind && state.catchmindScene && !state.catchmindBusy) {
+    updateCatchmindScene(state.catchmindScene, state.catchmind);
+  }
+}
+
+function catchmindHint() {
+  if (!state.catchmind || state.catchmindBusy) return;
+  const events = useCatchmindHint(state.catchmind);
+  if (events.length === 0) return;
+  handleCatchmindEvents(events);
+  updateCatchmindScene(state.catchmindScene, state.catchmind);
+}
+
+function catchmindAction(action) {
+  audio.playSfx("key");
+  if (action === "again") startCatchmind();
+  else if (action === "collection") showCatchmindCollection();
+  else if (action === "back") showCatchmindResult();
+  else if (action === "home") goHome();
+}
+
+function moveCatchmindFocus(delta, selector) {
+  const scene = state.catchmindScene;
+  if (!scene) return;
+  const buttons = [...scene.querySelectorAll(selector)].filter(
+    button => !button.disabled
+  );
+  if (buttons.length === 0) return;
+  const current = buttons.indexOf(document.activeElement);
+  const next =
+    current === -1
+      ? delta > 0 ? 0 : buttons.length - 1
+      : (current + delta + buttons.length) % buttons.length;
+  buttons[next].focus();
+  audio.playSfx("key");
+}
+
 function startMode(mode) {
   if (!isModeAvailable(mode, state.difficulty)) {
     showHint("도전에서는 더하기, 빼기와 곱하기를 해요.");
@@ -2436,6 +2692,11 @@ function startMode(mode) {
   state.delivery = null;
   state.deliveryScene = null;
   state.deliveryBusy = false;
+  state.catchmind = null;
+  state.catchmindScene = null;
+  state.catchmindReveal = null;
+  state.catchmindBusy = false;
+  state.catchmindView = "game";
   stopDeliveryBeat();
   if (mode === "safety") {
     startSafetyRoute();
@@ -2455,6 +2716,10 @@ function startMode(mode) {
     state.safety = null;
     state.safetyView = null;
     startDeliveryRun();
+  } else if (mode === "catchmind") {
+    state.safety = null;
+    state.safetyView = null;
+    startCatchmind();
   } else {
     state.safety = null;
     state.safetyView = null;
@@ -2491,6 +2756,11 @@ function goHome() {
   state.delivery = null;
   state.deliveryScene = null;
   state.deliveryBusy = false;
+  state.catchmind = null;
+  state.catchmindScene = null;
+  state.catchmindReveal = null;
+  state.catchmindBusy = false;
+  state.catchmindView = "game";
   dom.stage.setAttribute("aria-live", "polite");
   state.buffer = "";
   setMode(null);
@@ -2555,6 +2825,29 @@ document.addEventListener("keyup", event => {
 });
 
 dom.stage.addEventListener("click", event => {
+  // 슥삭 그림 퀴즈 — 카드·힌트·결과 버튼·도감 탭을 한자리에서 받는다.
+  if (state.mode === "catchmind" && state.catchmind && state.phase === "playing") {
+    const card = event.target.closest("[data-cm-card]");
+    if (card && !state.catchmindBusy) {
+      catchmindGuess(Number(card.dataset.cmCard));
+      return;
+    }
+    if (event.target.closest("[data-cm-hint]") && !state.catchmindBusy) {
+      catchmindHint();
+      return;
+    }
+    const action = event.target.closest("[data-cm-action]");
+    if (action) {
+      catchmindAction(action.dataset.cmAction);
+      return;
+    }
+    const tab = event.target.closest("[data-cm-tab]");
+    if (tab) {
+      audio.playSfx("key");
+      showCatchmindCollection(tab.dataset.cmTab);
+      return;
+    }
+  }
   // 택배 왔어요! — 방향·출발·층·벨·좌우 버튼을 한자리에서 받는다.
   if (state.mode === "delivery" && state.delivery && state.phase === "playing" &&
       !state.deliveryBusy) {
@@ -2814,6 +3107,76 @@ document.addEventListener("keydown", event => {
         return;
       }
       if (isDigit || direction || event.key === "Backspace") event.preventDefault();
+      return;
+    }
+    return;
+  }
+
+  // 슥삭 그림 퀴즈 — 숫자 1~4 = 카드, ←/→ 포커스, ⎵/Enter = 포커스 실행.
+  if (state.phase === "playing" && state.mode === "catchmind" && state.catchmind) {
+    const model = state.catchmind;
+    const isSpace =
+      event.key === " " || event.key === "Spacebar" || event.key === "Enter";
+    const isDigit = /^[0-9]$/.test(event.key);
+    const isArrow = event.key === "ArrowLeft" || event.key === "ArrowRight";
+
+    // 축하 연출 중엔 조작 키를 먹는다(Esc는 위에서 이미 처리).
+    if (state.catchmindBusy) {
+      if (isSpace || isDigit || isArrow || event.key === "Backspace") {
+        event.preventDefault();
+      }
+      return;
+    }
+
+    // 결과·도감 — ←/→로 버튼을 오가고, 실행은 버튼의 기본 Space/Enter.
+    if (model.phase === "result" || state.catchmindView !== "game") {
+      if (isArrow) {
+        event.preventDefault();
+        if (!event.repeat) {
+          moveCatchmindFocus(
+            event.key === "ArrowRight" ? 1 : -1,
+            "[data-cm-action],[data-cm-tab]"
+          );
+        }
+        return;
+      }
+      if (isDigit || event.key === "Backspace") {
+        event.preventDefault();
+        if (!event.repeat) audio.playSfx("pop");
+        return;
+      }
+      return;
+    }
+
+    if (/^[1-4]$/.test(event.key)) {
+      event.preventDefault();
+      if (!event.repeat) catchmindGuess(Number(event.key) - 1);
+      return;
+    }
+    if (isDigit || event.key === "Backspace") {
+      event.preventDefault();
+      if (!event.repeat) audio.playSfx("pop");
+      return;
+    }
+    if (isArrow) {
+      event.preventDefault();
+      if (!event.repeat) {
+        moveCatchmindFocus(
+          event.key === "ArrowRight" ? 1 : -1,
+          "[data-cm-card],[data-cm-hint]"
+        );
+      }
+      return;
+    }
+    if (isSpace) {
+      // 버튼에 포커스가 있으면 브라우저 기본 클릭에 맡긴다(택배와 같은 규칙).
+      const onButton =
+        typeof event.target?.closest === "function" &&
+        Boolean(event.target.closest("button"));
+      if (!onButton) {
+        event.preventDefault();
+        if (!event.repeat) moveCatchmindFocus(1, "[data-cm-card]");
+      }
       return;
     }
     return;

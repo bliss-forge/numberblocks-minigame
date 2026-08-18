@@ -14,7 +14,7 @@ test("정적 셸이 스타일과 앱 모듈을 로드한다", () => {
 
 test("1~5 모바일 보정 스타일은 기본 스타일 뒤에 로드된다", () => {
   const baseIndex = html.indexOf(
-    'href="styles.css?v=20260808-delivery"'
+    'href="styles.css?v=20260819-catchmind"'
   );
   const mobileIndex = html.indexOf(
     'href="mobile-games.css?v=20260808-delivery-home"'
@@ -28,7 +28,7 @@ test("스타일 시트는 최신 캐시 주소를 달고 나간다", () => {
   // 배포 후 옛 CSS 가 그대로 쓰이지 않도록, 내용이 바뀌면 이 값을 함께 올린다.
   assert.match(
     html,
-    /<link rel="stylesheet" href="styles\.css\?v=20260808-delivery">/
+    /<link rel="stylesheet" href="styles\.css\?v=20260819-catchmind">/
   );
   assert.match(
     html,
@@ -56,13 +56,14 @@ test("게임 화면은 화면 전환 뒤 프로그램 방식으로 포커스를 
   );
 });
 
-test("홈은 번호 배지가 있는 아홉 가지 놀이를 제공한다", () => {
-  assert.equal((html.match(/class="mode-card(?: [^"]*)?"/g) ?? []).length, 9);
+test("홈은 번호 배지가 있는 열 가지 놀이를 제공한다", () => {
+  assert.equal((html.match(/class="mode-card(?: [^"]*)?"/g) ?? []).length, 10);
   assert.match(html, /안전한 길찾기/);
   assert.match(html, /지하철 여행/);
   assert.match(html, /칙칙폭폭 기관사/);
   assert.match(html, /알록달록 물감 놀이/);
   assert.match(html, /택배 왔어요!/);
+  assert.match(html, /슥삭 그림 퀴즈/);
 });
 
 test("홈 카드 번호는 같은 번호의 블럭 친구를 사용한다", () => {
@@ -75,7 +76,8 @@ test("홈 카드 번호는 같은 번호의 블럭 친구를 사용한다", () =
     ["subway", "6", "six"],
     ["ktx", "7", "seven"],
     ["paint", "8", "eight"],
-    ["delivery", "9", "nine"]
+    ["delivery", "9", "nine"],
+    ["catchmind", "10", "ten"]
   ]) {
     const card = html.match(
       new RegExp(
