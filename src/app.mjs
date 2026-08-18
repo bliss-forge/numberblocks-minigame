@@ -170,6 +170,7 @@ import {
   useCatchmindHint
 } from "./catchmind-model.mjs";
 import {
+  paintCatchmindColorIn,
   paintCatchmindReveal,
   renderCatchmindCollection,
   renderCatchmindResult,
@@ -2574,10 +2575,23 @@ function startCatchmindCelebrate({ stars, item }) {
   audio.playSfx("win");
   state.stars += stars;
   dom.stars.textContent = String(state.stars);
-  if (state.catchmindReveal) paintCatchmindReveal(state.catchmindReveal, 1);
-  showCatchmindCelebrate(state.catchmindScene, item, stars);
   updateCatchmindScene(state.catchmindScene, model);
   dom.problem.textContent = `정답! ${item.n}`;
+
+  // ① 남은 선을 마저 긋고 ② 채색이 차오른 뒤 ③ 이름 배너 — 문서 §4-4 순서.
+  if (state.catchmindReveal) paintCatchmindReveal(state.catchmindReveal, 1);
+  [180, 380, 580].forEach(delay => {
+    schedule(() => {
+      if (state.catchmind === model && state.catchmindReveal) {
+        paintCatchmindColorIn(state.catchmindReveal, 0.5);
+      }
+    }, delay);
+  });
+  schedule(() => {
+    if (state.catchmind === model && state.catchmindScene) {
+      showCatchmindCelebrate(state.catchmindScene, item, stars);
+    }
+  }, 800);
 
   // 도감 수집 + 최근 출제 큐(다음 판 중복 방지, 최근 40개)
   catchmindCollected.add(item.n);
@@ -2586,7 +2600,7 @@ function startCatchmindCelebrate({ stars, item }) {
   catchmindWrite("nbmg.catchmind.recent", catchmindRecent);
 
   for (let i = 0; i < stars; i += 1) {
-    schedule(() => audio.playSfx("bell"), 500 + i * 220);
+    schedule(() => audio.playSfx("bell"), 900 + i * 220);
   }
   schedule(() => {
     if (state.catchmind !== model) return;

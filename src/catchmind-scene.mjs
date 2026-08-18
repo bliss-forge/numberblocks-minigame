@@ -1,8 +1,14 @@
-// 슥삭 그림 퀴즈 — 장면 렌더. 캔버스 붓칠 공개와 카드·게이지·결과·도감 DOM.
+// 슥삭 그림 퀴즈 — 장면 렌더. 선 그리기 공개 엔진과 카드·게이지·결과·도감 DOM.
 //
-// 붓칠 공개: 이모지를 오프스크린 캔버스에 크게 그려 두고, 붓이 지나간
-// 자리(뱀길 경로 위의 원형 붓자국)만 잘라내어 보이는 캔버스에 옮긴다.
-// 완료된 붓자국은 캔버스에 그대로 남으므로 매 프레임은 새 붓자국만 그린다.
+// 선 그리기 공개(캐치마인드 방식): 완성 그림을 닦아서 보여주는 게 아니라,
+// 이모지에서 윤곽선(실루엣 + 내부 색 경계)을 추출해 펜이 한 획씩 그린다.
+// 정답을 맞히기 전에는 선 그림만 보이고, 완성 채색본은 정답 후
+// paintCatchmindColorIn 이 선 아래에 깔아 준다(설계 문서 §4-4).
+//
+// 획 순서는 문서 §4-5의 저작 규칙을 따른다: 긴 경로(대개 실루엣)부터
+// 그리고 세부 장식이 뒤따른다. 획 색은 그 경계 주변의 원본 색을 어둡게
+// 뽑아 쓴다 — 색연필로 그리는 느낌이고, 모양과 색 카테고리(빨강·파랑…)도
+// 선만으로 구별된다.
 
 import {
   CATCHMIND_CATEGORIES,
@@ -16,8 +22,7 @@ import {
 } from "./catchmind-model.mjs";
 
 const CANVAS_SIZE = 300; // 논리 좌표. CSS 크기는 스타일시트가 정한다.
-const DAB_STEP = 8; // 붓자국 간격(논리 px)
-const DAB_RADIUS = 30; // 붓자국 반지름 — 줄 간격(약 34px)을 덮는다
+const STROKE_WIDTH = 4.5; // 펜 선 굵기(논리 px)
 
 function el(document, tag, className, text) {
   const node = document.createElement(tag);
@@ -26,47 +31,175 @@ function el(document, tag, className, text) {
   return node;
 }
 
-// ── 붓길: 좌우로 오가는 뱀길 ────────────────────────────────────────────────
-function brushPath() {
-  const points = [];
-  const rows = 8;
-  const top = 30;
-  const bottom = 270;
-  const left = 24;
-  const right = 276;
-  for (let row = 0; row < rows; row += 1) {
-    const y = top + ((bottom - top) * row) / (rows - 1);
-    if (row % 2 === 0) {
-      points.push([left, y], [right, y]);
-    } else {
-      points.push([right, y], [left, y]);
+// ── 윤곽선 추출 — 이모지 비트맵에서 획 경로를 만든다 ──────────────────────
+//
+// 1) 경계 픽셀 표시: 실루엣(불투명↔투명)과 내부 특징(이웃과 색 차가 큰 곳).
+//    완만한 그라데이션은 픽셀당 변화가 작아 경계로 잡히지 않는다.
+// 2) 경계 픽셀을 이웃 따라 걷기로 폴리라인으로 잇는다(반지름 2까지 틈 점프).
+// 3) 짧은 노이즈를 버리고 RDP 로 단순화한 뒤 긴 경로(실루엣)부터 정렬한다.
+//
+// 순수 함수 — {width, height, data}만 받으므로 노드 테스트가 가능하다.
+export function traceEmojiEdges(image, options = {}) {
+  const {
+    alphaMin = 64,     // 불투명 판정 문턱
+    colorDelta = 96,   // 내부 경계 판정: 이웃과 ΔR+ΔG+ΔB 가 이보다 크면 특징선
+    minPoints = 14,    // 이보다 짧은 원시 경로는 노이즈로 버린다
+    epsilon = 2,       // RDP 단순화 허용 오차(px)
+    maxPaths = 48      // 세부 장식 상한 — 긴 경로부터 남긴다
+  } = options;
+  const { width, height, data } = image;
+  const size = width * height;
+  const edge = new Uint8Array(size);
+  const opaque = index => data[index * 4 + 3] >= alphaMin;
+  const delta = (a, b) =>
+    Math.abs(data[a * 4] - data[b * 4]) +
+    Math.abs(data[a * 4 + 1] - data[b * 4 + 1]) +
+    Math.abs(data[a * 4 + 2] - data[b * 4 + 2]);
+
+  for (let y = 0; y < height - 1; y += 1) {
+    for (let x = 0; x < width - 1; x += 1) {
+      const here = y * width + x;
+      for (const neighbor of [here + 1, here + width]) {
+        const hereOpaque = opaque(here);
+        const neighborOpaque = opaque(neighbor);
+        if (hereOpaque !== neighborOpaque) {
+          edge[hereOpaque ? here : neighbor] = 1;
+        } else if (hereOpaque && delta(here, neighbor) > colorDelta) {
+          edge[here] = 1;
+        }
+      }
     }
   }
-  const segments = [];
-  let total = 0;
-  for (let i = 1; i < points.length; i += 1) {
-    const [x0, y0] = points[i - 1];
-    const [x1, y1] = points[i];
-    const length = Math.hypot(x1 - x0, y1 - y0);
-    segments.push({ x0, y0, x1, y1, start: total, length });
-    total += length;
+
+  const visited = new Uint8Array(size);
+  const near = [];
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      if (dx || dy) near.push([dx, dy]);
+    }
   }
-  return { segments, total };
+  const ring = [];
+  for (let dy = -2; dy <= 2; dy += 1) {
+    for (let dx = -2; dx <= 2; dx += 1) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) === 2) ring.push([dx, dy]);
+    }
+  }
+
+  const nextFrom = (x, y) => {
+    for (const offsets of [near, ring]) {
+      for (const [dx, dy] of offsets) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+        const index = ny * width + nx;
+        if (edge[index] && !visited[index]) return [nx, ny];
+      }
+    }
+    return null;
+  };
+
+  const walk = (startX, startY) => {
+    const points = [];
+    let x = startX;
+    let y = startY;
+    for (;;) {
+      const found = nextFrom(x, y);
+      if (!found) return points;
+      [x, y] = found;
+      visited[y * width + x] = 1;
+      points.push([x, y]);
+    }
+  };
+
+  const paths = [];
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x;
+      if (!edge[index] || visited[index]) continue;
+      visited[index] = 1;
+      const forward = walk(x, y);
+      const backward = walk(x, y).reverse(); // 씨앗이 곡선 중간이면 반대쪽도 걷는다
+      const raw = [...backward, [x, y], ...forward];
+      if (raw.length < minPoints) continue;
+
+      // 획 색: 경로 주변의 불투명 픽셀 평균을 어둡게 — 색연필 느낌.
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let samples = 0;
+      for (let i = 0; i < raw.length; i += 4) {
+        const [px, py] = raw[i];
+        for (const [dx, dy] of [[0, 0], ...near]) {
+          const sx = px + dx;
+          const sy = py + dy;
+          if (sx < 0 || sy < 0 || sx >= width || sy >= height) continue;
+          const s = sy * width + sx;
+          if (!opaque(s)) continue;
+          r += data[s * 4];
+          g += data[s * 4 + 1];
+          b += data[s * 4 + 2];
+          samples += 1;
+        }
+      }
+      // 어둡게(×0.62) 한 뒤에도 밝은 이모지(외계인·하양 계열)는 선이 옅어서
+      // 크림색 배경에 묻힌다 — 휘도 상한 170으로 한 번 더 눌러 준다.
+      let sr = (r / Math.max(1, samples)) * 0.62;
+      let sg = (g / Math.max(1, samples)) * 0.62;
+      let sb = (b / Math.max(1, samples)) * 0.62;
+      const luma = 0.299 * sr + 0.587 * sg + 0.114 * sb;
+      if (luma > 170) {
+        const scale = 170 / luma;
+        sr *= scale;
+        sg *= scale;
+        sb *= scale;
+      }
+      const points = simplifyPath(raw, epsilon);
+      paths.push({
+        points,
+        length: pathLength(points),
+        color: samples > 0
+          ? `rgb(${Math.round(sr)}, ${Math.round(sg)}, ${Math.round(sb)})`
+          : "#3a3a3a"
+      });
+    }
+  }
+
+  paths.sort((a, b) => b.length - a.length);
+  return paths.slice(0, maxPaths);
 }
 
-function pointAt(path, distance) {
-  const clamped = Math.max(0, Math.min(path.total, distance));
-  for (const segment of path.segments) {
-    if (clamped <= segment.start + segment.length) {
-      const t = segment.length === 0 ? 0 : (clamped - segment.start) / segment.length;
-      return [
-        segment.x0 + (segment.x1 - segment.x0) * t,
-        segment.y0 + (segment.y1 - segment.y0) * t
-      ];
+function pathLength(points) {
+  let total = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    total += Math.hypot(
+      points[i][0] - points[i - 1][0],
+      points[i][1] - points[i - 1][1]
+    );
+  }
+  return total;
+}
+
+// Ramer–Douglas–Peucker — 걷기 경로의 지그재그를 곧게 편다.
+function simplifyPath(points, epsilon) {
+  if (points.length <= 2) return points;
+  const [x0, y0] = points[0];
+  const [x1, y1] = points[points.length - 1];
+  let maxDistance = 0;
+  let maxIndex = 0;
+  const span = Math.hypot(x1 - x0, y1 - y0) || 0.0001;
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const [px, py] = points[i];
+    const distance =
+      Math.abs((x1 - x0) * (y0 - py) - (x0 - px) * (y1 - y0)) / span;
+    if (distance > maxDistance) {
+      maxDistance = distance;
+      maxIndex = i;
     }
   }
-  const last = path.segments[path.segments.length - 1];
-  return [last.x1, last.y1];
+  if (maxDistance <= epsilon) return [points[0], points[points.length - 1]];
+  const left = simplifyPath(points.slice(0, maxIndex + 1), epsilon);
+  const right = simplifyPath(points.slice(maxIndex), epsilon);
+  return [...left.slice(0, -1), ...right];
 }
 
 // ── 라운드 장면 ────────────────────────────────────────────────────────────
@@ -140,6 +273,7 @@ export function renderCatchmindRound(document, model) {
 }
 
 // 캔버스 준비 — 브라우저에서만 부른다(테스트의 가짜 DOM은 getContext가 없다).
+// 라운드 시작 때 한 번 윤곽선을 추출한다(300×300, 수 ms).
 export function setupCatchmindReveal(scene, item, globals = globalThis) {
   const canvas = scene.querySelector(".cm-canvas");
   if (typeof canvas?.getContext !== "function") return null;
@@ -150,6 +284,23 @@ export function setupCatchmindReveal(scene, item, globals = globalThis) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
+  const emojiFont =
+    '210px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+
+  // 윤곽 추출용 — 논리 300×300 그대로 그려 좌표계를 캔버스와 일치시킨다.
+  const traceCanvas = canvas.ownerDocument.createElement("canvas");
+  traceCanvas.width = CANVAS_SIZE;
+  traceCanvas.height = CANVAS_SIZE;
+  const traceCtx = traceCanvas.getContext("2d", { willReadFrequently: true });
+  traceCtx.textAlign = "center";
+  traceCtx.textBaseline = "middle";
+  traceCtx.font = emojiFont;
+  traceCtx.fillText(item.e, CANVAS_SIZE / 2, CANVAS_SIZE / 2 + 12);
+  const paths = traceEmojiEdges(
+    traceCtx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE)
+  );
+
+  // 정답 후 채색용 — 선명하게 DPR 배율로 따로 그려 둔다.
   const emoji = canvas.ownerDocument.createElement("canvas");
   emoji.width = CANVAS_SIZE * dpr;
   emoji.height = CANVAS_SIZE * dpr;
@@ -157,51 +308,89 @@ export function setupCatchmindReveal(scene, item, globals = globalThis) {
   emojiCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   emojiCtx.textAlign = "center";
   emojiCtx.textBaseline = "middle";
-  emojiCtx.font =
-    '210px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+  emojiCtx.font = emojiFont;
   emojiCtx.fillText(item.e, CANVAS_SIZE / 2, CANVAS_SIZE / 2 + 12);
 
   return {
     canvas,
     ctx,
     emoji,
-    path: brushPath(),
+    paths,
+    totalLength: paths.reduce((sum, path) => sum + path.length, 0) || 1,
+    pathIndex: 0,
+    segIndex: 0,
+    segOffset: 0,
     painted: 0,
+    tip: null,
     done: false,
     brush: scene.querySelector(".cm-brush")
   };
 }
 
-// 진행률만큼 붓자국을 더 그린다. 완료 프레임에서는 전체를 한 번에 찍는다.
+// 진행률만큼 선을 이어 그린다 — 완료된 선은 캔버스에 남으므로 새 구간만 긋는다.
+// 정답 전에는 선 그림뿐이다. 완성 채색은 paintCatchmindColorIn 이 맡는다.
 export function paintCatchmindReveal(reveal, fraction) {
   if (!reveal || reveal.done) return;
-  const { ctx, emoji, path } = reveal;
-  const target = fraction * path.total;
+  const { ctx, paths } = reveal;
+  const target = Math.min(1, fraction) * reveal.totalLength;
 
-  while (reveal.painted < target) {
-    const [x, y] = pointAt(path, reveal.painted);
-    ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = STROKE_WIDTH;
+
+  while (reveal.painted < target - 0.01 && reveal.pathIndex < paths.length) {
+    const path = paths[reveal.pathIndex];
+    if (reveal.segIndex >= path.points.length - 1) {
+      reveal.pathIndex += 1; // 펜을 들어 다음 획으로
+      reveal.segIndex = 0;
+      reveal.segOffset = 0;
+      continue;
+    }
+    const [x0, y0] = path.points[reveal.segIndex];
+    const [x1, y1] = path.points[reveal.segIndex + 1];
+    const segLength = Math.hypot(x1 - x0, y1 - y0) || 0.0001;
+    const step = Math.min(segLength - reveal.segOffset, target - reveal.painted);
+    const t0 = reveal.segOffset / segLength;
+    const t1 = (reveal.segOffset + step) / segLength;
+
+    ctx.strokeStyle = path.color;
     ctx.beginPath();
-    ctx.arc(x, y, DAB_RADIUS, 0, Math.PI * 2);
-    ctx.clip();
-    ctx.drawImage(emoji, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    ctx.restore();
-    reveal.painted += DAB_STEP;
+    ctx.moveTo(x0 + (x1 - x0) * t0, y0 + (y1 - y0) * t0);
+    ctx.lineTo(x0 + (x1 - x0) * t1, y0 + (y1 - y0) * t1);
+    ctx.stroke();
+
+    reveal.painted += step;
+    reveal.segOffset += step;
+    reveal.tip = [x0 + (x1 - x0) * t1, y0 + (y1 - y0) * t1];
+    if (reveal.segOffset >= segLength - 0.001) {
+      reveal.segIndex += 1;
+      reveal.segOffset = 0;
+    }
   }
 
   if (fraction >= 1) {
-    ctx.drawImage(emoji, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
     reveal.done = true;
     if (reveal.brush) reveal.brush.hidden = true;
     return;
   }
 
-  if (reveal.brush) {
-    const [x, y] = pointAt(path, target);
+  if (reveal.brush && reveal.tip) {
     reveal.brush.hidden = false;
-    reveal.brush.style.left = `${(x / CANVAS_SIZE) * 100}%`;
-    reveal.brush.style.top = `${(y / CANVAS_SIZE) * 100}%`;
+    reveal.brush.style.left = `${(reveal.tip[0] / CANVAS_SIZE) * 100}%`;
+    reveal.brush.style.top = `${(reveal.tip[1] / CANVAS_SIZE) * 100}%`;
   }
+}
+
+// 정답 후 채색 — 완성 이모지를 선 아래(destination-over)에 깔아 준다.
+// 작은 alpha 로 여러 번 부르면 서서히 차오르는 연출이 된다.
+export function paintCatchmindColorIn(reveal, alpha = 1) {
+  if (!reveal) return;
+  const { ctx } = reveal;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.globalCompositeOperation = "destination-over";
+  ctx.drawImage(reveal.emoji, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  ctx.restore();
 }
 
 // 매 프레임 DOM 갱신 — 게이지·라이브 별·힌트 버튼·라운드 점.
