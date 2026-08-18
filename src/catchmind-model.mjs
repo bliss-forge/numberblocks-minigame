@@ -12,21 +12,34 @@
 // 문서와 다른 점(이모지 방식 채택에 따른 의도적 단순화):
 // - 오답 3개는 저작 고정 목록 대신 같은 카테고리에서 시드 난수로 뽑는다.
 //   이모지는 선화와 달리 오독 소지가 없어 금지쌍 테이블이 필요 없다.
-// - 연령 2모드 대신 홈 난이도(쉬움/차근차근/도전)를 그대로 쓴다.
+// - 연령 2모드·홈 난이도 대신 단계 진행(1단계→2단계→…)이 난이도를 정한다.
 
 import { CATCHMIND_ITEMS } from "./catchmind-data.mjs";
 
 export const CATCHMIND_ROUNDS = 5;
 
-// 라운드별 문항 레벨 배분 — 쉬움은 익숙한 것만, 도전은 어려운 것 위주.
-export const LEVEL_PLAN = Object.freeze({
-  easy: Object.freeze([1, 1, 1, 1, 2]),
-  steady: Object.freeze([1, 1, 2, 2, 3]),
-  challenge: Object.freeze([2, 2, 3, 3, 3])
-});
+// 단계 진행(2026-08-19 사용자 지시: "1단계, 2단계, 3단계 식으로").
+// 한 단계 = 그림 5개. 단계가 오를수록 문항 레벨이 어려워지고 그리기가
+// 빨라진다. 5단계에서 상한 — 이후는 같은 난이도로 끝없이 이어진다.
+// 실패가 없으므로 단계는 언제나 완료되고, 다음 단계로만 나아간다.
+// 이 게임은 홈 난이도(쉬움/차근차근/도전) 대신 단계가 난이도를 정한다.
+const STAGE_PLANS = Object.freeze([
+  Object.freeze({ levels: Object.freeze([1, 1, 1, 1, 1]), durationScale: 1.3 }),
+  Object.freeze({ levels: Object.freeze([1, 1, 1, 2, 2]), durationScale: 1.15 }),
+  Object.freeze({ levels: Object.freeze([1, 2, 2, 2, 3]), durationScale: 1 }),
+  Object.freeze({ levels: Object.freeze([2, 2, 3, 3, 3]), durationScale: 0.9 }),
+  Object.freeze({ levels: Object.freeze([3, 3, 3, 3, 3]), durationScale: 0.8 })
+]);
 
-// 공개(붓칠) 시간 배속 — 쉬움은 천천히, 도전은 빠르게.
-const SPEED = Object.freeze({ easy: 4 / 3, steady: 1, challenge: 0.8 });
+export function normalizeStage(stage) {
+  const parsed = Math.floor(Number(stage));
+  return Number.isFinite(parsed) && parsed >= 1 ? parsed : 1;
+}
+
+export function stagePlan(stage) {
+  const index = Math.min(normalizeStage(stage), STAGE_PLANS.length) - 1;
+  return STAGE_PLANS[index];
+}
 
 // 레벨별 기준 공개 시간(ms). 문서의 T1=6000/T2=8000/T3=10000을 따른다.
 const BASE_REVEAL_MS = Object.freeze([6000, 8000, 10000]);
@@ -48,9 +61,8 @@ export function mulberry32(seed) {
   };
 }
 
-export function revealDurationMs(item, difficulty) {
-  const speed = SPEED[difficulty] ?? SPEED.steady;
-  return Math.round(BASE_REVEAL_MS[item.l - 1] * speed);
+export function revealDurationMs(item, stage) {
+  return Math.round(BASE_REVEAL_MS[item.l - 1] * stagePlan(stage).durationScale);
 }
 
 function shuffled(list, rng) {
@@ -107,9 +119,10 @@ function buildCards(answer, rng, items) {
   return { cards, answerIndex: cards.findIndex(card => card.n === answer.n) };
 }
 
-export function createCatchmind(difficulty, seed = 1, options = {}) {
+export function createCatchmind(stage, seed = 1, options = {}) {
   const { recent = [], items = CATCHMIND_ITEMS } = options;
-  const plan = LEVEL_PLAN[difficulty] ?? LEVEL_PLAN.steady;
+  const normalized = normalizeStage(stage);
+  const plan = stagePlan(normalized).levels;
   const rng = mulberry32(seed);
   const answers = chooseAnswers(plan, rng, recent, items);
   const rounds = answers.map(answer => ({
@@ -118,7 +131,7 @@ export function createCatchmind(difficulty, seed = 1, options = {}) {
   }));
 
   const model = {
-    difficulty,
+    stage: normalized,
     seed,
     rng,
     rounds,
@@ -143,7 +156,7 @@ function resetRound(model) {
   const round = model.rounds[model.roundIndex];
   model.phase = "reveal";
   model.elapsedMs = 0;
-  model.revealMs = revealDurationMs(round.item, model.difficulty);
+  model.revealMs = revealDurationMs(round.item, model.stage);
   model.wrong = [];
   model.hintLevel = 0;
   model.hintUsedH2 = false;

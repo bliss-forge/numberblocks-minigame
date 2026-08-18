@@ -2472,9 +2472,15 @@ const catchmindCollected = new Set(
     : []
 );
 let catchmindBest = Number(catchmindRead("nbmg.catchmind.best", 0)) || 0;
+// 다음에 도전할 단계 — 단계를 완료할 때마다 올려 저장하므로,
+// 게임을 껐다 켜도 도달한 단계에서 이어서 시작한다.
+let catchmindStage = Math.max(
+  1,
+  Math.floor(Number(catchmindRead("nbmg.catchmind.stage", 1))) || 1
+);
 
 function catchmindCaption() {
-  return `슥삭이가 그림을 그려요 — ${state.catchmind.roundIndex + 1}번째 그림`;
+  return `${state.catchmind.stage}단계 — 슥삭이가 무엇을 그리는 걸까요?`;
 }
 
 function renderCatchmindStage() {
@@ -2489,14 +2495,14 @@ function renderCatchmindStage() {
   updateCatchmindScene(scene, state.catchmind);
 }
 
-function startCatchmind() {
+function startCatchmind(stage = catchmindStage) {
   stopSafetyHold();
-  clearTimers(); // "다시 하기" 재진입 시 이전 틱 체인이 겹돌지 않게 먼저 끊는다
+  clearTimers(); // 재진입 시 이전 틱 체인이 겹돌지 않게 먼저 끊는다
   audio.cancel();
   state.round += 1;
   state.problem = null;
   state.buffer = "";
-  state.catchmind = createCatchmind(state.difficulty, Date.now() >>> 0, {
+  state.catchmind = createCatchmind(stage, Date.now() >>> 0, {
     recent: catchmindRecent
   });
   state.catchmindBusy = false;
@@ -2625,12 +2631,17 @@ function showCatchmindResult() {
     catchmindBest = model.totalStars;
     catchmindWrite("nbmg.catchmind.best", catchmindBest);
   }
+  // 단계 완료가 곧 진행 저장 — 결과 화면에서 꺼도 다음엔 다음 단계부터.
+  if (model.stage + 1 > catchmindStage) {
+    catchmindStage = model.stage + 1;
+    catchmindWrite("nbmg.catchmind.stage", catchmindStage);
+  }
   const scene = renderCatchmindResult(document, model, catchmindBest);
   state.catchmindScene = scene;
   dom.stage.replaceChildren(scene);
-  dom.problem.textContent = `다 그렸어요! 별 ${model.totalStars}개`;
+  dom.problem.textContent = `${model.stage}단계 완료! 별 ${model.totalStars}개`;
   audio.playSfx("jingle");
-  scene.querySelector("[data-cm-action='again']")?.focus?.();
+  scene.querySelector("[data-cm-action='next']")?.focus?.();
 }
 
 function showCatchmindCollection(tab = state.catchmindTab) {
@@ -2663,7 +2674,7 @@ function catchmindHint() {
 
 function catchmindAction(action) {
   audio.playSfx("key");
-  if (action === "again") startCatchmind();
+  if (action === "next") startCatchmind(catchmindStage);
   else if (action === "collection") showCatchmindCollection();
   else if (action === "back") showCatchmindResult();
   else if (action === "home") goHome();

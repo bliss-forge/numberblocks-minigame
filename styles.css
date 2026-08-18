@@ -11028,6 +11028,16 @@ body[data-mode="catchmind"] .stage-lights {
   gap: 12px;
 }
 
+.cm-stage {
+  padding: 6px 14px;
+  border: 2px solid #3e8ed0;
+  border-radius: 999px;
+  background: #e8f2fb;
+  color: #2b6ca3;
+  font-size: 18px;
+  font-weight: 900;
+}
+
 .cm-dots {
   display: flex;
   gap: 8px;
@@ -11513,6 +11523,11 @@ body[data-mode="catchmind"] .stage-lights {
 
   .cm-chip-label {
     display: none;
+  }
+
+  .cm-stage {
+    padding: 4px 10px;
+    font-size: 15px;
   }
 
   .cm-board {

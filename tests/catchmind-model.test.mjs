@@ -6,14 +6,15 @@ import {
   CATCHMIND_ROUNDS,
   HINT_AUTO_MS,
   HINT_REPEAT_MS,
-  LEVEL_PLAN,
   advanceCatchmind,
   createCatchmind,
   currentCatchmindRound,
   guessCatchmindCard,
   hintButtonReady,
   mulberry32,
+  normalizeStage,
   revealDurationMs,
+  stagePlan,
   starsIfNow,
   tickCatchmind,
   useCatchmindHint
@@ -32,8 +33,8 @@ const tick = (model, ms, step = 100) => {
 };
 
 test("시드가 같으면 같은 판이 나온다", () => {
-  const a = createCatchmind("steady", 42);
-  const b = createCatchmind("steady", 42);
+  const a = createCatchmind(3, 42);
+  const b = createCatchmind(3, 42);
   assert.deepEqual(
     a.rounds.map(round => round.item.n),
     b.rounds.map(round => round.item.n)
@@ -44,20 +45,30 @@ test("시드가 같으면 같은 판이 나온다", () => {
   );
 });
 
-test("한 판은 5라운드, 레벨 배분은 난이도 표를 따른다", () => {
-  for (const difficulty of ["easy", "steady", "challenge"]) {
-    const model = createCatchmind(difficulty, 7);
+test("한 판은 5라운드, 문항 레벨은 단계 표를 따른다", () => {
+  for (const stage of [1, 2, 3, 4, 5, 9]) {
+    const model = createCatchmind(stage, 7);
     assert.equal(model.rounds.length, CATCHMIND_ROUNDS);
+    assert.equal(model.stage, stage);
     assert.deepEqual(
       model.rounds.map(round => round.item.l),
-      [...LEVEL_PLAN[difficulty]]
+      [...stagePlan(stage).levels]
     );
   }
 });
 
+test("단계 표 — 1단계는 전부 쉬운 문항, 5단계 이후는 상한 고정", () => {
+  assert.deepEqual([...stagePlan(1).levels], [1, 1, 1, 1, 1]);
+  assert.deepEqual([...stagePlan(4).levels], [2, 2, 3, 3, 3]);
+  assert.equal(stagePlan(9), stagePlan(5));
+  assert.equal(normalizeStage("abc"), 1);
+  assert.equal(normalizeStage(0), 1);
+  assert.equal(normalizeStage(7.9), 7);
+});
+
 test("시드 1..200에서 정답 중복 0, 같은 카테고리 3회 이상 없음, 카드 규칙 유지", () => {
   for (let seed = 1; seed <= 200; seed += 1) {
-    const model = createCatchmind("steady", seed);
+    const model = createCatchmind(3, seed);
     const names = model.rounds.map(round => round.item.n);
     assert.equal(new Set(names).size, 5, `seed ${seed}: 정답 중복`);
 
@@ -78,9 +89,9 @@ test("시드 1..200에서 정답 중복 0, 같은 카테고리 3회 이상 없�
 });
 
 test("최근 출제 문항은 다음 판에서 빠진다", () => {
-  const first = createCatchmind("steady", 11);
+  const first = createCatchmind(3, 11);
   const recent = first.rounds.map(round => round.item.n);
-  const second = createCatchmind("steady", 12, { recent });
+  const second = createCatchmind(3, 12, { recent });
   for (const round of second.rounds) {
     assert.ok(!recent.includes(round.item.n), `재출제: ${round.item.n}`);
   }
@@ -88,12 +99,12 @@ test("최근 출제 문항은 다음 판에서 빠진다", () => {
 
 test("최근 목록이 풀을 다 덮어도 예외 없이 5문항을 채운다", () => {
   const recent = CATCHMIND_ITEMS.map(item => item.n);
-  const model = createCatchmind("challenge", 3, { recent });
+  const model = createCatchmind(5, 3, { recent });
   assert.equal(model.rounds.length, 5);
 });
 
 test("별 판정 — 절대 시간 기준 3/2/1", () => {
-  const model = createCatchmind("steady", 5);
+  const model = createCatchmind(3, 5);
   const half = model.revealMs * 0.5;
 
   // 첫 시도 + 50% 이내 = ★3
@@ -112,7 +123,7 @@ test("별 판정 — 절대 시간 기준 3/2/1", () => {
 });
 
 test("오답이 나오면 첫 시도 조건이 깨져 50% 이내라도 ★2", () => {
-  const model = createCatchmind("steady", 5);
+  const model = createCatchmind(3, 5);
   const round = currentCatchmindRound(model);
   const wrongIndex = round.answerIndex === 0 ? 1 : 0;
   tick(model, 500);
@@ -131,7 +142,7 @@ test("오답이 나오면 첫 시도 조건이 깨져 50% 이내라도 ★2", ()
 });
 
 test("힌트 버튼 — 3초 전 비활성, H1·H2는 오답 제거, H3는 공개 종료 후에만", () => {
-  const model = createCatchmind("steady", 9);
+  const model = createCatchmind(3, 9);
   const round = currentCatchmindRound(model);
 
   assert.equal(hintButtonReady(model), false);
@@ -167,7 +178,7 @@ test("힌트 버튼 — 3초 전 비활성, H1·H2는 오답 제거, H3는 공�
 });
 
 test("자동 힌트 — 공개 종료 후 8/16/28초, 이후 10초마다 펄스", () => {
-  const model = createCatchmind("steady", 21);
+  const model = createCatchmind(3, 21);
   tick(model, model.revealMs); // 공개 종료
 
   let events = tick(model, HINT_AUTO_MS[0]);
@@ -184,7 +195,7 @@ test("자동 힌트 — 공개 종료 후 8/16/28초, 이후 10초마다 펄스"
 });
 
 test("5라운드를 다 맞히면 결과로 넘어가고 별이 누적된다", () => {
-  const model = createCatchmind("easy", 33);
+  const model = createCatchmind(1, 33);
   for (let round = 0; round < 5; round += 1) {
     const events = guessCatchmindCard(
       model,
@@ -206,7 +217,7 @@ test("5라운드를 다 맞히면 결과로 넘어가고 별이 누적된다", (
 });
 
 test("축하·결과 중에는 카드 입력이 잠긴다", () => {
-  const model = createCatchmind("steady", 55);
+  const model = createCatchmind(3, 55);
   guessCatchmindCard(model, currentCatchmindRound(model).answerIndex);
   assert.equal(model.phase, "celebrate");
   assert.deepEqual(guessCatchmindCard(model, 0), []);
@@ -214,13 +225,14 @@ test("축하·결과 중에는 카드 입력이 잠긴다", () => {
   assert.deepEqual(useCatchmindHint(model), []);
 });
 
-test("공개 시간 — 레벨 6/8/10초에 난이도 배속", () => {
+test("공개 시간 — 레벨 6/8/10초에 단계 배속, 5단계 이후 상한", () => {
   const l1 = { l: 1 };
   const l3 = { l: 3 };
-  assert.equal(revealDurationMs(l1, "steady"), 6000);
-  assert.equal(revealDurationMs(l3, "steady"), 10000);
-  assert.equal(revealDurationMs(l1, "easy"), 8000);
-  assert.equal(revealDurationMs(l1, "challenge"), 4800);
+  assert.equal(revealDurationMs(l1, 3), 6000);
+  assert.equal(revealDurationMs(l3, 3), 10000);
+  assert.equal(revealDurationMs(l1, 1), 7800);
+  assert.equal(revealDurationMs(l1, 5), 4800);
+  assert.equal(revealDurationMs(l3, 12), revealDurationMs(l3, 5));
 });
 
 test("mulberry32 — 같은 시드는 같은 수열", () => {

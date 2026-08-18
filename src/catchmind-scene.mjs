@@ -209,6 +209,7 @@ export function renderCatchmindRound(document, model) {
   root.dataset.cmPhase = model.phase;
 
   const top = el(document, "div", "cm-top");
+  const stageBadge = el(document, "span", "cm-stage", `${model.stage}단계`);
   const dots = el(document, "div", "cm-dots");
   dots.setAttribute("aria-label", `${CATCHMIND_ROUNDS}판 중 ${model.roundIndex + 1}번째 그림`);
   for (let i = 0; i < CATCHMIND_ROUNDS; i += 1) {
@@ -225,7 +226,7 @@ export function renderCatchmindRound(document, model) {
     el(document, "span", "cm-chip-icon", category.icon),
     el(document, "span", "cm-chip-label", category.label)
   );
-  top.append(dots, chip, live);
+  top.append(stageBadge, dots, chip, live);
 
   const board = el(document, "div", "cm-board");
   const hint = el(document, "button", "cm-hint", "💡");
@@ -456,7 +457,12 @@ export function showCatchmindCelebrate(scene, item, stars) {
 // ── 결과 화면 ──────────────────────────────────────────────────────────────
 export function renderCatchmindResult(document, model, best) {
   const root = el(document, "div", "cm-root cm-result");
-  const title = el(document, "h2", "cm-result-title", "참 잘했어요!");
+  const title = el(
+    document,
+    "h2",
+    "cm-result-title",
+    `${model.stage}단계 완료! 참 잘했어요!`
+  );
 
   const total = el(document, "div", "cm-result-total");
   total.append(
@@ -482,7 +488,7 @@ export function renderCatchmindResult(document, model, best) {
 
   const actions = el(document, "div", "cm-actions");
   for (const [action, label, icon] of [
-    ["again", "다시 하기", "🔄"],
+    ["next", `${model.stage + 1}단계 가기`, "▶"],
     ["collection", "그림 도감", "📖"],
     ["home", "처음으로", "🏠"]
   ]) {
