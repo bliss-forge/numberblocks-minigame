@@ -11089,30 +11089,6 @@ body[data-mode="catchmind"] .stage-lights {
   min-height: 0;
 }
 
-.cm-hint {
-  display: grid;
-  justify-items: center;
-  gap: 2px;
-  width: 92px;
-  padding: 10px 8px;
-  border: 3px solid #d9cfb0;
-  border-radius: 22px;
-  background: #fff;
-  box-shadow: 0 4px 0 #e8dfc8;
-  font-size: 34px;
-  cursor: pointer;
-}
-
-.cm-hint:disabled {
-  opacity: .4;
-  cursor: default;
-}
-
-.cm-hint:not(:disabled):hover {
-  border-color: #3e8ed0;
-}
-
-.cm-hint:focus-visible,
 .cm-card:focus-visible,
 .cm-action:focus-visible,
 .cm-tab:focus-visible {
@@ -11120,28 +11096,29 @@ body[data-mode="catchmind"] .stage-lights {
   outline-offset: 3px;
 }
 
-.cm-hint-label {
-  color: #4a3b2a;
-  font-size: 16px;
+.cm-step {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 84px;
+  padding: 12px 10px;
+  border: 3px solid #d9cfb0;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 4px 0 #e8dfc8;
+}
+
+.cm-step-number {
+  color: #2b6ca3;
+  font-size: 22px;
   font-weight: 900;
 }
 
-.cm-hint-pips {
-  display: flex;
-  gap: 4px;
-}
-
-.cm-hint-pip {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #f8c825;
-  border: 1px solid #c9a132;
-}
-
-.cm-hint-pip.used {
-  background: #e0d8c6;
-  border-color: #d9cfb0;
+.cm-step-name {
+  color: #8a7b63;
+  font-size: 15px;
+  font-weight: 900;
+  word-break: keep-all;
 }
 
 .cm-frame {
@@ -11217,6 +11194,11 @@ body[data-mode="catchmind"] .stage-lights {
   width: 0%;
   border-radius: 8px;
   background: #5c8cb8;
+}
+
+/* 다음 단계까지 남은 시간(8초)이 줄어드는 동안은 노란 막대 */
+.cm-gauge-fill.countdown {
+  background: #f8c825;
 }
 
 .cm-cards {
@@ -11506,14 +11488,18 @@ body[data-mode="catchmind"] .stage-lights {
     gap: 10px;
   }
 
-  .cm-hint {
-    width: 64px;
-    border-radius: 16px;
-    font-size: 26px;
+  .cm-step {
+    min-width: 58px;
+    padding: 8px 6px;
+    border-radius: 14px;
   }
 
-  .cm-hint-label {
-    font-size: 13px;
+  .cm-step-number {
+    font-size: 16px;
+  }
+
+  .cm-step-name {
+    font-size: 11px;
   }
 
   .cm-frame {

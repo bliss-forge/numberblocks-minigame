@@ -1,27 +1,25 @@
-// 슥삭 그림 퀴즈 로직 계약 — 선정·단계 공개·힌트 5회·별 판정·오답 처리.
+// 슥삭 그림 퀴즈 로직 계약 — 선정·3단계 공개(스케치→형태→완성)·별 판정·오답.
 
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  AUTO_HINT_IDLE_MS,
-  CATCHMIND_HINT_MAX,
   CATCHMIND_ROUNDS,
+  GUESS_WINDOW_MS,
   RESCUE_PULSE_MS,
-  STEP_FRACTIONS,
+  REVEAL_STEPS,
+  STEP_NAMES,
   advanceCatchmind,
   createCatchmind,
   currentCatchmindRound,
   guessCatchmindCard,
-  hintButtonReady,
-  hintsRemaining,
+  guessCountdown,
   mulberry32,
   normalizeStage,
+  overallRevealProgress,
   revealDurationMs,
-  revealFraction,
   stagePlan,
   starsIfNow,
-  tickCatchmind,
-  useCatchmindHint
+  tickCatchmind
 } from "../src/catchmind-model.mjs";
 import { CATCHMIND_ITEMS } from "../src/catchmind-data.mjs";
 
@@ -117,69 +115,60 @@ test("최근 목록이 풀을 다 덮어도 예외 없이 5문항을 채운다",
   assert.equal(model.rounds.length, 5);
 });
 
-test("단계 공개 — 시작하면 25%(큰 윤곽)까지만 그리고 멈춘다", () => {
+test("공개 3단계 — 스케치를 다 그리면 멈추고, 8초 안엔 넘어가지 않는다", () => {
   const model = createCatchmind(3, 5);
   assert.equal(model.phase, "drawing");
-  assert.equal(model.revealTarget, STEP_FRACTIONS[0]);
-  assert.equal(revealFraction(model), 0);
+  assert.equal(model.step, 1);
+  assert.equal(STEP_NAMES.length, REVEAL_STEPS);
 
   const events = finishStep(model);
-  assert.ok(events.some(e => e.type === "step-done" && e.step === 1));
+  assert.ok(events.some(e => e.type === "step-done" && e.step === 1 && !e.final));
   assert.equal(model.phase, "guess");
-  assert.ok(Math.abs(revealFraction(model) - 0.25) < 0.01);
+  assert.equal(model.step, 1);
+  assert.ok(Math.abs(overallRevealProgress(model) - 1 / 3) < 0.01);
 
-  // 멈춘 뒤에는 시간이 지나도 더 그려지지 않는다(자동 힌트 전까지).
-  tick(model, AUTO_HINT_IDLE_MS - 1000);
-  assert.ok(Math.abs(revealFraction(model) - 0.25) < 0.01);
+  // 8초 전에는 다음 단계로 넘어가지 않고, 카운트다운이 줄어든다.
+  tick(model, GUESS_WINDOW_MS - 1000);
+  assert.equal(model.step, 1);
+  const countdown = guessCountdown(model);
+  assert.ok(countdown !== null && countdown > 0 && countdown < 0.2);
 });
 
-test("힌트 = 다음 단계 그리기, 총 5번, 남은 횟수가 줄어든다", () => {
+test("8초 동안 못 맞히면 자동으로 다음 단계 — 스케치→형태→완성", () => {
   const model = createCatchmind(3, 9);
-  assert.equal(hintButtonReady(model), false); // 그리는 중엔 비활성
-  assert.deepEqual(useCatchmindHint(model), []);
-
   finishStep(model);
-  assert.equal(hintButtonReady(model), true);
-  assert.equal(hintsRemaining(model), CATCHMIND_HINT_MAX);
 
-  for (let use = 1; use <= CATCHMIND_HINT_MAX; use += 1) {
-    const events = useCatchmindHint(model);
-    assert.equal(events[0].type, "hint");
-    assert.equal(events[0].used, use);
-    assert.equal(events[0].auto, false);
-    assert.equal(model.phase, "drawing");
-    assert.equal(model.revealTarget, STEP_FRACTIONS[use]);
-    finishStep(model);
-    assert.ok(Math.abs(revealFraction(model) - STEP_FRACTIONS[use]) < 0.01);
-  }
+  let events = tick(model, GUESS_WINDOW_MS);
+  assert.ok(events.some(e => e.type === "step" && e.step === 2));
+  assert.equal(model.phase, "drawing");
+  finishStep(model);
+  assert.equal(model.step, 2);
 
-  // 5번을 다 쓰면 그림이 완성되고 힌트는 끝.
-  assert.equal(revealFraction(model), 1);
-  assert.equal(hintsRemaining(model), 0);
-  assert.equal(hintButtonReady(model), false);
-  assert.deepEqual(useCatchmindHint(model), []);
+  events = tick(model, GUESS_WINDOW_MS);
+  assert.ok(events.some(e => e.type === "step" && e.step === 3));
+  events = finishStep(model);
+  assert.ok(events.some(e => e.type === "step-done" && e.final));
+  assert.equal(overallRevealProgress(model), 1);
+
+  // 3단계 뒤에는 카운트가 없다 — 8초가 지나도 단계가 늘지 않는다.
+  assert.equal(guessCountdown(model), null);
+  tick(model, GUESS_WINDOW_MS);
+  assert.equal(model.step, 3);
 });
 
-test("별 판정 — 힌트 0~1번+한 번에 ★3, 3번 이내 ★2, 그 외 ★1", () => {
+test("별 판정 — 1단계 한 번에 ★3, 2단계 ★2, 3단계 ★1", () => {
   const model = createCatchmind(3, 5);
   finishStep(model);
-  assert.equal(starsIfNow(model), 3); // 힌트 0
+  assert.equal(starsIfNow(model), 3); // 스케치 단계
 
-  useCatchmindHint(model);
+  tick(model, GUESS_WINDOW_MS);
+  assert.equal(starsIfNow(model), 2); // 형태 단계(그리는 중 포함)
   finishStep(model);
-  assert.equal(starsIfNow(model), 3); // 힌트 1
+  assert.equal(starsIfNow(model), 2);
 
-  useCatchmindHint(model);
+  tick(model, GUESS_WINDOW_MS);
   finishStep(model);
-  assert.equal(starsIfNow(model), 2); // 힌트 2
-
-  useCatchmindHint(model);
-  finishStep(model);
-  assert.equal(starsIfNow(model), 2); // 힌트 3
-
-  useCatchmindHint(model);
-  finishStep(model);
-  assert.equal(starsIfNow(model), 1); // 힌트 4
+  assert.equal(starsIfNow(model), 1); // 완성 단계
 
   const round = currentCatchmindRound(model);
   const correct = guessCatchmindCard(model, round.answerIndex);
@@ -203,24 +192,14 @@ test("오답이 나오면 ★3이 깨지고, 오답 카드는 라운드 내 영�
   assert.equal(model.totalStars, 2);
 });
 
-test("가만히 있으면 자동으로 다음 단계를 그려 준다(힌트 5번에 포함)", () => {
+test("완성 뒤에도 못 고르면 정답 카드가 주기적으로 반짝인다", () => {
   const model = createCatchmind(3, 21);
   finishStep(model);
-  const events = tick(model, AUTO_HINT_IDLE_MS);
-  const auto = events.find(e => e.type === "hint");
-  assert.ok(auto, "자동 힌트가 없다");
-  assert.equal(auto.auto, true);
-  assert.equal(auto.used, 1);
-  assert.equal(model.phase, "drawing");
-});
+  tick(model, GUESS_WINDOW_MS);
+  finishStep(model);
+  tick(model, GUESS_WINDOW_MS);
+  finishStep(model);
 
-test("힌트 소진 후에도 못 고르면 정답 카드가 주기적으로 반짝인다", () => {
-  const model = createCatchmind(3, 21);
-  finishStep(model);
-  for (let use = 0; use < CATCHMIND_HINT_MAX; use += 1) {
-    useCatchmindHint(model);
-    finishStep(model);
-  }
   let events = tick(model, RESCUE_PULSE_MS);
   assert.ok(events.some(e => e.type === "rescue-pulse"));
   assert.equal(model.rescue, true);
@@ -241,8 +220,8 @@ test("5라운드를 다 맞히면 결과로 넘어가고 별이 누적된다", (
     if (round < 4) {
       assert.deepEqual(advanced, [{ type: "round", index: round + 1 }]);
       assert.equal(model.phase, "drawing");
-      assert.equal(revealFraction(model), 0);
-      assert.equal(hintsRemaining(model), CATCHMIND_HINT_MAX);
+      assert.equal(model.step, 1);
+      assert.equal(model.stepProgress, 0);
     } else {
       assert.deepEqual(advanced, [{ type: "result", totalStars: 15 }]);
       assert.equal(model.phase, "result");
@@ -257,7 +236,6 @@ test("축하·결과 중에는 카드 입력이 잠긴다", () => {
   assert.equal(model.phase, "celebrate");
   assert.deepEqual(guessCatchmindCard(model, 0), []);
   assert.deepEqual(tickCatchmind(model, 100), []);
-  assert.deepEqual(useCatchmindHint(model), []);
 });
 
 test("전체 그림 시간 — 레벨 6/8/10초에 판 램프 배속, 5판 이후 상한", () => {

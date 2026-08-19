@@ -165,9 +165,7 @@ import {
   createCatchmind,
   currentCatchmindRound,
   guessCatchmindCard,
-  revealFraction,
-  tickCatchmind,
-  useCatchmindHint
+  tickCatchmind
 } from "./catchmind-model.mjs";
 import {
   paintCatchmindColorIn,
@@ -2513,7 +2511,7 @@ function startCatchmind(stage = catchmindStage) {
   renderCatchmindStage();
   setPhase("playing");
   audio.playSfx("jingle");
-  showHint("조금만 보고 맞히면 별 3개! 모르겠으면 힌트를 눌러요");
+  showHint("스케치만 보고 맞히면 별 3개!");
   scheduleCatchmindTick();
 }
 
@@ -2528,7 +2526,9 @@ function scheduleCatchmindTick(previousMs = performance.now()) {
       handleCatchmindEvents(tickCatchmind(model, delta));
       if (state.catchmind === model) {
         if (state.catchmindReveal) {
-          paintCatchmindReveal(state.catchmindReveal, revealFraction(model));
+          paintCatchmindReveal(
+            state.catchmindReveal, model.step, model.stepProgress
+          );
         }
         if (state.catchmindScene) {
           updateCatchmindScene(state.catchmindScene, model);
@@ -2544,14 +2544,16 @@ function handleCatchmindEvents(events) {
     switch (event.type) {
       case "step-done":
         // 한 단계를 다 그리고 펜을 내려놓는 작은 신호.
-        if (!event.complete) audio.playSfx("key");
+        audio.playSfx("key");
+        if (!event.final) showHint("무슨 그림일까요? 못 맞히면 더 그려 줄게요");
         break;
-      case "hint":
+      case "step":
+        // 8초 안에 못 맞혀서 다음 단계를 그리기 시작한다.
         audio.playSfx("pop");
         showHint(
-          event.remaining > 0
-            ? `슥삭이가 조금 더 그려요! 힌트 ${event.remaining}번 남았어요`
-            : "마지막 힌트! 그림을 끝까지 그려 줄게요"
+          event.step === 2
+            ? "이번엔 형태를 잡아 볼게요!"
+            : "이제 그림으로 완성할게요!"
         );
         break;
       case "rescue-pulse":
@@ -2588,7 +2590,7 @@ function startCatchmindCelebrate({ stars, item }) {
   dom.problem.textContent = `정답! ${item.n}`;
 
   // ① 남은 선을 마저 긋고 ② 채색이 차오른 뒤 ③ 이름 배너 — 문서 §4-4 순서.
-  if (state.catchmindReveal) paintCatchmindReveal(state.catchmindReveal, 1);
+  if (state.catchmindReveal) paintCatchmindReveal(state.catchmindReveal, 3, 1);
   [180, 380, 580].forEach(delay => {
     schedule(() => {
       if (state.catchmind === model && state.catchmindReveal) {
@@ -2665,14 +2667,6 @@ function catchmindGuess(index) {
   if (state.catchmind && state.catchmindScene && !state.catchmindBusy) {
     updateCatchmindScene(state.catchmindScene, state.catchmind);
   }
-}
-
-function catchmindHint() {
-  if (!state.catchmind || state.catchmindBusy) return;
-  const events = useCatchmindHint(state.catchmind);
-  if (events.length === 0) return;
-  handleCatchmindEvents(events);
-  updateCatchmindScene(state.catchmindScene, state.catchmind);
 }
 
 function catchmindAction(action) {
@@ -2858,10 +2852,6 @@ dom.stage.addEventListener("click", event => {
     const card = event.target.closest("[data-cm-card]");
     if (card && !state.catchmindBusy) {
       catchmindGuess(Number(card.dataset.cmCard));
-      return;
-    }
-    if (event.target.closest("[data-cm-hint]") && !state.catchmindBusy) {
-      catchmindHint();
       return;
     }
     const action = event.target.closest("[data-cm-action]");
@@ -3191,7 +3181,7 @@ document.addEventListener("keydown", event => {
       if (!event.repeat) {
         moveCatchmindFocus(
           event.key === "ArrowRight" ? 1 : -1,
-          "[data-cm-card],[data-cm-hint]"
+          "[data-cm-card]"
         );
       }
       return;

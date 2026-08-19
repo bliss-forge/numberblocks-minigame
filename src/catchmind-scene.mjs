@@ -1,8 +1,10 @@
 // 슥삭 그림 퀴즈 — 장면 렌더. 선 그리기 공개 엔진과 카드·게이지·결과·도감 DOM.
 //
-// 선 그리기 공개(캐치마인드 방식): 완성 그림을 닦아서 보여주는 게 아니라,
-// 이모지에서 윤곽선(실루엣 + 내부 색 경계)을 추출해 펜이 한 획씩 그린다.
-// 정답을 맞히기 전에는 선 그림만 보이고, 완성 채색본은 정답 후
+// 선 그리기 공개(캐치마인드 방식): 이모지에서 추출한 윤곽선을 화가처럼
+// 3단계로 그린다 — ① 스케치(연한 가는 선으로 큰 윤곽만) ② 형태 잡기(같은
+// 선을 진하게 다시 긋고 형태 추가) ③ 완성(색연필 선으로 전부). 단계가
+// 바뀌면 펜이 처음부터 그 위에 덧그린다 — 밑그림 위에 본선을 얹는 그 느낌.
+// 정답을 맞히기 전에는 선 그림뿐이고, 완성 채색본은 정답 후
 // paintCatchmindColorIn 이 선 아래에 깔아 준다(설계 문서 §4-4).
 //
 // 획 순서는 문서 §4-5의 저작 규칙을 따른다: 긴 경로(대개 실루엣)부터
@@ -15,16 +17,22 @@ import {
   CATCHMIND_ITEMS
 } from "./catchmind-data.mjs";
 import {
-  CATCHMIND_HINT_MAX,
   CATCHMIND_ROUNDS,
-  hintButtonReady,
-  hintsRemaining,
-  revealFraction,
+  STEP_NAMES,
+  guessCountdown,
+  overallRevealProgress,
   starsIfNow
 } from "./catchmind-model.mjs";
 
 const CANVAS_SIZE = 300; // 논리 좌표. CSS 크기는 스타일시트가 정한다.
-const STROKE_WIDTH = 4.5; // 펜 선 굵기(논리 px)
+
+// 공개 3단계의 그리기 스타일 — fraction 은 전체 선 길이 중 얼마나 긋는지.
+// final 단계만 획별 원본 색(color: null)을 쓰고, 앞 단계는 연필 톤 단색.
+const STAGE_STYLES = Object.freeze([
+  Object.freeze({ fraction: 0.45, width: 2.5, color: "#c9c1ae" }), // 스케치
+  Object.freeze({ fraction: 0.75, width: 3.5, color: "#8a7b63" }), // 형태 잡기
+  Object.freeze({ fraction: 1, width: 4.5, color: null })          // 완성
+]);
 
 function el(document, tag, className, text) {
   const node = document.createElement(tag);
@@ -230,17 +238,12 @@ export function renderCatchmindRound(document, model) {
   top.append(dots, chip, live);
 
   const board = el(document, "div", "cm-board");
-  const hint = el(document, "button", "cm-hint", "💡");
-  hint.type = "button";
-  hint.dataset.cmHint = "1";
-  hint.append(el(document, "span", "cm-hint-label", "힌트"));
-  // 남은 힌트 5개를 점으로 — 글을 못 읽어도 몇 번 남았는지 보인다.
-  const pips = el(document, "span", "cm-hint-pips");
-  for (let i = 0; i < CATCHMIND_HINT_MAX; i += 1) {
-    pips.append(el(document, "i", "cm-hint-pip"));
-  }
-  hint.append(pips);
-  hint.setAttribute("aria-label", "힌트 — 슥삭이가 그림을 더 그려 줘요");
+  // 지금 몇 단계인지 — 1단계 스케치 / 2단계 형태 잡기 / 3단계 완성.
+  const step = el(document, "span", "cm-step");
+  step.append(
+    el(document, "strong", "cm-step-number", "1단계"),
+    el(document, "span", "cm-step-name", STEP_NAMES[0])
+  );
 
   const frame = el(document, "div", "cm-frame");
   frame.setAttribute("role", "img");
@@ -252,7 +255,7 @@ export function renderCatchmindRound(document, model) {
   banner.hidden = true;
   frame.append(canvas, brush, banner);
 
-  board.append(hint, frame);
+  board.append(step, frame);
 
   // 얼마나 그려졌는지 보여 주는 진행 막대 — 별 판정과는 무관한 순수 정보.
   const gauge = el(document, "div", "cm-gauge");
@@ -323,6 +326,7 @@ export function setupCatchmindReveal(scene, item, globals = globalThis) {
     emoji,
     paths,
     totalLength: paths.reduce((sum, path) => sum + path.length, 0) || 1,
+    stage: 1,      // 지금 긋고 있는 공개 단계(1~3)
     pathIndex: 0,
     segIndex: 0,
     segOffset: 0,
@@ -333,16 +337,16 @@ export function setupCatchmindReveal(scene, item, globals = globalThis) {
   };
 }
 
-// 진행률만큼 선을 이어 그린다 — 완료된 선은 캔버스에 남으므로 새 구간만 긋는다.
-// 정답 전에는 선 그림뿐이다. 완성 채색은 paintCatchmindColorIn 이 맡는다.
-export function paintCatchmindReveal(reveal, fraction) {
-  if (!reveal || reveal.done) return;
+// 현재 단계의 선을 목표 길이까지 긋는다 — 완료된 선은 캔버스에 남으므로
+// 매 프레임 새 구간만 긋는다.
+function drawStageTo(reveal, progress) {
   const { ctx, paths } = reveal;
-  const target = Math.min(1, fraction) * reveal.totalLength;
+  const style = STAGE_STYLES[reveal.stage - 1];
+  const target = Math.min(1, progress) * style.fraction * reveal.totalLength;
 
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  ctx.lineWidth = STROKE_WIDTH;
+  ctx.lineWidth = style.width;
 
   while (reveal.painted < target - 0.01 && reveal.pathIndex < paths.length) {
     const path = paths[reveal.pathIndex];
@@ -359,7 +363,7 @@ export function paintCatchmindReveal(reveal, fraction) {
     const t0 = reveal.segOffset / segLength;
     const t1 = (reveal.segOffset + step) / segLength;
 
-    ctx.strokeStyle = path.color;
+    ctx.strokeStyle = style.color ?? path.color;
     ctx.beginPath();
     ctx.moveTo(x0 + (x1 - x0) * t0, y0 + (y1 - y0) * t0);
     ctx.lineTo(x0 + (x1 - x0) * t1, y0 + (y1 - y0) * t1);
@@ -373,8 +377,24 @@ export function paintCatchmindReveal(reveal, fraction) {
       reveal.segOffset = 0;
     }
   }
+}
 
-  if (fraction >= 1) {
+// 공개 단계를 그린다. 단계가 바뀌면 이전 단계를 즉시 마저 긋고, 펜을 처음으로
+// 되돌려 같은 선 위에 진하게 덧그린다 — 스케치 → 형태 → 완성의 화가 흐름.
+export function paintCatchmindReveal(reveal, step, progress) {
+  if (!reveal || reveal.done) return;
+
+  while (reveal.stage < step) {
+    drawStageTo(reveal, 1);
+    reveal.stage += 1;
+    reveal.pathIndex = 0;
+    reveal.segIndex = 0;
+    reveal.segOffset = 0;
+    reveal.painted = 0;
+  }
+  drawStageTo(reveal, progress);
+
+  if (step >= STAGE_STYLES.length && progress >= 1) {
     reveal.done = true;
     if (reveal.brush) reveal.brush.hidden = true;
     return;
@@ -399,29 +419,29 @@ export function paintCatchmindColorIn(reveal, alpha = 1) {
   ctx.restore();
 }
 
-// 매 프레임 DOM 갱신 — 게이지·라이브 별·힌트 버튼·라운드 점.
+// 매 프레임 DOM 갱신 — 단계 칩·게이지·라이브 별·라운드 점.
 export function updateCatchmindScene(scene, model) {
   scene.dataset.cmPhase = model.phase;
 
-  const fraction = revealFraction(model);
+  const number = scene.querySelector(".cm-step-number");
+  if (number) number.textContent = `${model.step}단계`;
+  const name = scene.querySelector(".cm-step-name");
+  if (name) name.textContent = STEP_NAMES[model.step - 1];
+
+  // 게이지: 대기 중(1·2단계 뒤)에는 다음 단계까지 남은 시간이 줄어드는
+  // 노란 막대, 그 외에는 전체 그리기 진행을 보여 주는 파란 막대.
   const fill = scene.querySelector(".cm-gauge-fill");
-  if (fill) fill.style.width = `${Math.round(fraction * 1000) / 10}%`;
+  if (fill) {
+    const countdown = guessCountdown(model);
+    fill.classList.toggle("countdown", countdown !== null);
+    const fraction = countdown ?? overallRevealProgress(model);
+    fill.style.width = `${Math.round(fraction * 1000) / 10}%`;
+  }
 
   const now = starsIfNow(model);
   scene.querySelectorAll(".cm-live-star").forEach((star, index) => {
     star.classList.toggle("lit", index < now);
   });
-
-  const hint = scene.querySelector(".cm-hint");
-  if (hint) {
-    const ready = hintButtonReady(model);
-    hint.disabled = !ready;
-    hint.setAttribute("aria-disabled", String(!ready));
-    const remaining = hintsRemaining(model);
-    hint.querySelectorAll(".cm-hint-pip").forEach((pip, index) => {
-      pip.classList.toggle("used", index >= remaining);
-    });
-  }
 
   scene.querySelectorAll(".cm-dot").forEach((dot, index) => {
     dot.classList.toggle("done", index < model.roundIndex);
