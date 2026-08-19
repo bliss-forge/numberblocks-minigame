@@ -2,7 +2,10 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { traceEmojiEdges } from "../src/catchmind-scene.mjs";
+import {
+  roughenPath as traceRoughen,
+  traceEmojiEdges
+} from "../src/catchmind-scene.mjs";
 
 // {width, height, data} 합성 이미지 — painter(x, y)가 [r,g,b,a] 또는 null.
 function makeImage(width, height, painter) {
@@ -107,4 +110,21 @@ test("획 색은 주변 원본 색을 어둡게 뽑는다", () => {
   const [, r, g, b] = match.map(Number);
   assert.ok(r > g && r > b, "빨간 도형의 획이 빨간 계열이 아니다");
   assert.ok(r < 220, "어둡게 만들지 않았다");
+});
+
+test("roughenPath — 단순화하고 손떨림을 더하되 결정적이다", () => {
+  const dense = Array.from({ length: 60 }, (_, i) => [i, Math.round(Math.sin(i / 4) * 2)]);
+  const rough = traceRoughen(dense, { epsilon: 12, jitter: 3.5 });
+  assert.ok(rough.length < dense.length, "단순화가 안 됐다");
+  // 손떨림은 jitter 반경 안 — 원래 선에서 크게 벗어나지 않는다.
+  for (const [, y] of rough) {
+    assert.ok(Math.abs(y) <= 2 + 12 + 3.5, `너무 멀리 벗어남 y=${y}`);
+  }
+  // 결정적 — 같은 입력이면 같은 출력(매 프레임 모양이 흔들리면 안 된다).
+  assert.deepEqual(rough, traceRoughen(dense, { epsilon: 12, jitter: 3.5 }));
+});
+
+test("roughenPath — epsilon·jitter 0이면 원본 그대로", () => {
+  const points = [[0, 0], [10, 3], [20, 0]];
+  assert.deepEqual(traceRoughen(points, { epsilon: 0, jitter: 0 }), points);
 });

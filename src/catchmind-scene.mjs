@@ -1,9 +1,10 @@
 // 슥삭 그림 퀴즈 — 장면 렌더. 선 그리기 공개 엔진과 카드·게이지·결과·도감 DOM.
 //
 // 선 그리기 공개(캐치마인드 방식): 이모지에서 추출한 윤곽선을 화가처럼
-// 3단계로 그린다 — ① 스케치(연한 가는 선으로 큰 윤곽만) ② 형태 잡기(같은
-// 선을 진하게 다시 긋고 형태 추가) ③ 완성(색연필 선으로 전부). 단계가
-// 바뀌면 펜이 처음부터 그 위에 덧그린다 — 밑그림 위에 본선을 얹는 그 느낌.
+// 3단계로 그린다. 세 단계 모두 그림 "전체"를 그리고, 단계마다 정밀도가
+// 다르다 — ① 스케치: 심하게 단순화하고 삐뚤빼뚤한 연한 선(엄청 대충 그린
+// 밑그림) ② 형태 잡기: 더 정확한 진회색 선으로 덧그리기 ③ 완성: 원본
+// 좌표 그대로 색연필 선. 단계가 바뀌면 펜이 처음으로 돌아가 위에 덧그린다.
 // 정답을 맞히기 전에는 선 그림뿐이고, 완성 채색본은 정답 후
 // paintCatchmindColorIn 이 선 아래에 깔아 준다(설계 문서 §4-4).
 //
@@ -26,12 +27,16 @@ import {
 
 const CANVAS_SIZE = 300; // 논리 좌표. CSS 크기는 스타일시트가 정한다.
 
-// 공개 3단계의 그리기 스타일 — fraction 은 전체 선 길이 중 얼마나 긋는지.
+// 공개 3단계의 그리기 스타일 — 세 단계 모두 그림 전체를 긋고 정밀도만
+// 다르다. epsilon 은 경로 단순화 강도, jitter 는 손떨림 크기(px).
 // final 단계만 획별 원본 색(color: null)을 쓰고, 앞 단계는 연필 톤 단색.
 const STAGE_STYLES = Object.freeze([
-  Object.freeze({ fraction: 0.45, width: 2.5, color: "#c9c1ae" }), // 스케치
-  Object.freeze({ fraction: 0.75, width: 3.5, color: "#8a7b63" }), // 형태 잡기
-  Object.freeze({ fraction: 1, width: 4.5, color: null })          // 완성
+  // 스케치 — 심하게 단순화 + 크게 삐뚤빼뚤, 연한 가는 선
+  Object.freeze({ epsilon: 12, jitter: 3.5, width: 2.5, color: "#c9c1ae" }),
+  // 형태 잡기 — 살짝 단순화, 진회색
+  Object.freeze({ epsilon: 5, jitter: 1, width: 3.5, color: "#8a7b63" }),
+  // 완성 — 원본 좌표 그대로, 색연필
+  Object.freeze({ epsilon: 0, jitter: 0, width: 4.5, color: null })
 ]);
 
 function el(document, tag, className, text) {
@@ -212,6 +217,20 @@ function simplifyPath(points, epsilon) {
   return [...left.slice(0, -1), ...right];
 }
 
+// 경로를 "대충 그린 손그림"으로 만든다 — 세게 단순화한 뒤 점마다 결정적
+// 손떨림(좌표 해시 기반이라 매 프레임 같은 모양)을 더한다. 순수 함수.
+export function roughenPath(points, { epsilon = 12, jitter = 3 } = {}) {
+  const simplified = epsilon > 0 ? simplifyPath(points, epsilon) : points;
+  if (jitter <= 0) return simplified;
+  return simplified.map(([x, y], index) => {
+    const hash = Math.sin(x * 12.9898 + y * 78.233 + index * 37.719) * 43758.5453;
+    const angle = (hash - Math.floor(hash)) * Math.PI * 2;
+    const spin = hash * 7;
+    const radius = (spin - Math.floor(spin)) * jitter;
+    return [x + Math.cos(angle) * radius, y + Math.sin(angle) * radius];
+  });
+}
+
 // ── 라운드 장면 ────────────────────────────────────────────────────────────
 export function renderCatchmindRound(document, model) {
   const round = model.rounds[model.roundIndex];
@@ -320,12 +339,23 @@ export function setupCatchmindReveal(scene, item, globals = globalThis) {
   emojiCtx.font = emojiFont;
   emojiCtx.fillText(item.e, CANVAS_SIZE / 2, CANVAS_SIZE / 2 + 12);
 
+  // 단계별 경로 세트 — 같은 그림을 정밀도만 다르게 세 벌 준비한다.
+  const sets = STAGE_STYLES.map(style => {
+    const stagePaths = paths.map(path => {
+      const points = roughenPath(path.points, style);
+      return { points, color: path.color, length: pathLength(points) };
+    });
+    return {
+      paths: stagePaths,
+      totalLength: stagePaths.reduce((sum, path) => sum + path.length, 0) || 1
+    };
+  });
+
   return {
     canvas,
     ctx,
     emoji,
-    paths,
-    totalLength: paths.reduce((sum, path) => sum + path.length, 0) || 1,
+    sets,
     stage: 1,      // 지금 긋고 있는 공개 단계(1~3)
     pathIndex: 0,
     segIndex: 0,
@@ -340,9 +370,10 @@ export function setupCatchmindReveal(scene, item, globals = globalThis) {
 // 현재 단계의 선을 목표 길이까지 긋는다 — 완료된 선은 캔버스에 남으므로
 // 매 프레임 새 구간만 긋는다.
 function drawStageTo(reveal, progress) {
-  const { ctx, paths } = reveal;
+  const { ctx } = reveal;
   const style = STAGE_STYLES[reveal.stage - 1];
-  const target = Math.min(1, progress) * style.fraction * reveal.totalLength;
+  const { paths, totalLength } = reveal.sets[reveal.stage - 1];
+  const target = Math.min(1, progress) * totalLength;
 
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
