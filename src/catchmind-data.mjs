@@ -23,7 +23,6 @@ export const CATCHMIND_CATEGORIES = Object.freeze({
   wear: Object.freeze({ label: "몸과 옷", icon: "👕" }),
   play: Object.freeze({ label: "운동과 놀이", icon: "⚽" }),
   place: Object.freeze({ label: "장소", icon: "🏠" }),
-  shape: Object.freeze({ label: "모양과 색", icon: "🔴" }),
   people: Object.freeze({ label: "사람과 친구", icon: "🧚" })
 });
 
@@ -546,22 +545,6 @@ export const CATCHMIND_ITEMS = Object.freeze([
     ["🏟️", "경기장", 2],
     ["🛖", "오두막", 3],
     ["🚦", "신호등", 1]
-  ]),
-  ...cat("shape", [
-    ["❤️", "하트", 1],
-    ["⭕", "동그라미", 1],
-    ["🔺", "세모", 1],
-    ["🟦", "네모", 1],
-    ["🔶", "마름모", 2],
-    ["🔴", "빨강", 1],
-    ["🟠", "주황", 1],
-    ["🟡", "노랑", 1],
-    ["🟢", "초록", 1],
-    ["🔵", "파랑", 1],
-    ["🟣", "보라", 1],
-    ["🟤", "갈색", 1],
-    ["⚫", "검정", 1],
-    ["⚪", "하양", 1]
   ]),
   ...cat("people", [
     ["👶", "아기", 1],

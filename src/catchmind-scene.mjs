@@ -1,17 +1,15 @@
 // 슥삭 그림 퀴즈 — 장면 렌더. 선 그리기 공개 엔진과 카드·게이지·결과·도감 DOM.
 //
-// 선 그리기 공개(캐치마인드 방식): 이모지에서 추출한 윤곽선을 화가처럼
-// 3단계로 그린다. 세 단계 모두 그림 "전체"를 그리고, 단계마다 정밀도가
-// 다르다 — ① 스케치: 심하게 단순화하고 삐뚤빼뚤한 연한 선(엄청 대충 그린
-// 밑그림) ② 형태 잡기: 더 정확한 진회색 선으로 덧그리기 ③ 완성: 원본
-// 좌표 그대로 색연필 선. 단계가 바뀌면 펜이 처음으로 돌아가 위에 덧그린다.
-// 정답을 맞히기 전에는 선 그림뿐이고, 완성 채색본은 정답 후
-// paintCatchmindColorIn 이 선 아래에 깔아 준다(설계 문서 §4-4).
+// 선 그리기 공개(캐치마인드 방식, 2026-08-20 사용자 지시로 3단계 개편):
+// ① 스케치: 그림 전체를 심하게 단순화한 삐뚤빼뚤 연한 선(엄청 대충 그린
+// 밑그림) ② 자세히 그리기: 원본 좌표 그대로 색연필 선으로 꼼꼼히 덧그리기
+// ③ 색칠하기: 완성 이모지 색을 선 아래(destination-over)에 위→아래로
+// 차오르게 깔아 준다. 단계가 바뀌면 펜이 처음으로 돌아가 위에 덧그린다.
+// 정답 후 paintCatchmindColorIn 은 남은 채색을 진하게 마무리한다(§4-4).
 //
 // 획 순서는 문서 §4-5의 저작 규칙을 따른다: 긴 경로(대개 실루엣)부터
 // 그리고 세부 장식이 뒤따른다. 획 색은 그 경계 주변의 원본 색을 어둡게
-// 뽑아 쓴다 — 색연필로 그리는 느낌이고, 모양과 색 카테고리(빨강·파랑…)도
-// 선만으로 구별된다.
+// 뽑아 쓴다 — 색연필로 그리는 느낌이다.
 
 import {
   CATCHMIND_CATEGORIES,
@@ -27,17 +25,17 @@ import {
 
 const CANVAS_SIZE = 300; // 논리 좌표. CSS 크기는 스타일시트가 정한다.
 
-// 공개 3단계의 그리기 스타일 — 세 단계 모두 그림 전체를 긋고 정밀도만
-// 다르다. epsilon 은 경로 단순화 강도, jitter 는 손떨림 크기(px).
-// final 단계만 획별 원본 색(color: null)을 쓰고, 앞 단계는 연필 톤 단색.
+// 선 단계(1~2)의 그리기 스타일 — 둘 다 그림 전체를 긋고 정밀도만 다르다.
+// epsilon 은 경로 단순화 강도, jitter 는 손떨림 크기(px). 2단계는 획별
+// 원본 색(color: null)의 색연필 선. 3단계는 선이 아니라 색칠이라 여기 없다.
 const STAGE_STYLES = Object.freeze([
   // 스케치 — 심하게 단순화 + 크게 삐뚤빼뚤, 연한 가는 선
   Object.freeze({ epsilon: 12, jitter: 3.5, width: 2.5, color: "#c9c1ae" }),
-  // 형태 잡기 — 살짝 단순화, 진회색
-  Object.freeze({ epsilon: 5, jitter: 1, width: 3.5, color: "#8a7b63" }),
-  // 완성 — 원본 좌표 그대로, 색연필
+  // 자세히 그리기 — 원본 좌표 그대로, 색연필
   Object.freeze({ epsilon: 0, jitter: 0, width: 4.5, color: null })
 ]);
+// 마지막 단계(색칠하기) 번호 = 선 단계 수 + 1.
+const COLOR_STAGE = STAGE_STYLES.length + 1;
 
 function el(document, tag, className, text) {
   const node = document.createElement(tag);
@@ -257,7 +255,7 @@ export function renderCatchmindRound(document, model) {
   top.append(dots, chip, live);
 
   const board = el(document, "div", "cm-board");
-  // 지금 몇 단계인지 — 1단계 스케치 / 2단계 형태 잡기 / 3단계 완성.
+  // 지금 몇 단계인지 — 1단계 스케치 / 2단계 자세히 그리기 / 3단계 색칠하기.
   const step = el(document, "span", "cm-step");
   step.append(
     el(document, "strong", "cm-step-number", "1단계"),
@@ -356,7 +354,8 @@ export function setupCatchmindReveal(scene, item, globals = globalThis) {
     ctx,
     emoji,
     sets,
-    stage: 1,      // 지금 긋고 있는 공개 단계(1~3)
+    stage: 1,      // 지금 긋고 있는 공개 단계(1~3, 3은 색칠)
+    fillHeight: 0, // 색칠 단계에서 이미 칠한 세로 높이(논리 px)
     pathIndex: 0,
     segIndex: 0,
     segOffset: 0,
@@ -410,22 +409,49 @@ function drawStageTo(reveal, progress) {
   }
 }
 
+// 색칠 단계 — 완성 이모지를 선 아래(destination-over)에 위→아래 붓질로
+// 차오르게 깔아 준다. 이미 칠한 띠는 다시 그리지 않는다(불투명 중복 방지).
+function drawColorTo(reveal, progress) {
+  const targetHeight = Math.min(1, progress) * CANVAS_SIZE;
+  if (targetHeight > reveal.fillHeight + 0.01) {
+    const { ctx } = reveal;
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-over";
+    ctx.beginPath();
+    ctx.rect(0, reveal.fillHeight, CANVAS_SIZE, targetHeight - reveal.fillHeight);
+    ctx.clip();
+    ctx.drawImage(reveal.emoji, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    ctx.restore();
+    reveal.fillHeight = targetHeight;
+  }
+  // 붓끝은 칠하는 줄을 따라 좌우로 왔다 갔다 — 붓질하는 느낌.
+  reveal.tip = [
+    CANVAS_SIZE * (0.5 + 0.35 * Math.sin(progress * 14)),
+    Math.min(targetHeight, CANVAS_SIZE - 4)
+  ];
+}
+
+function drawRevealTo(reveal, progress) {
+  if (reveal.stage >= COLOR_STAGE) drawColorTo(reveal, progress);
+  else drawStageTo(reveal, progress);
+}
+
 // 공개 단계를 그린다. 단계가 바뀌면 이전 단계를 즉시 마저 긋고, 펜을 처음으로
-// 되돌려 같은 선 위에 진하게 덧그린다 — 스케치 → 형태 → 완성의 화가 흐름.
+// 되돌린다 — 스케치 → 자세히 그리기 → 색칠하기의 화가 흐름.
 export function paintCatchmindReveal(reveal, step, progress) {
   if (!reveal || reveal.done) return;
 
   while (reveal.stage < step) {
-    drawStageTo(reveal, 1);
+    drawRevealTo(reveal, 1);
     reveal.stage += 1;
     reveal.pathIndex = 0;
     reveal.segIndex = 0;
     reveal.segOffset = 0;
     reveal.painted = 0;
   }
-  drawStageTo(reveal, progress);
+  drawRevealTo(reveal, progress);
 
-  if (step >= STAGE_STYLES.length && progress >= 1) {
+  if (step >= COLOR_STAGE && progress >= 1) {
     reveal.done = true;
     if (reveal.brush) reveal.brush.hidden = true;
     return;
@@ -438,8 +464,8 @@ export function paintCatchmindReveal(reveal, step, progress) {
   }
 }
 
-// 정답 후 채색 — 완성 이모지를 선 아래(destination-over)에 깔아 준다.
-// 작은 alpha 로 여러 번 부르면 서서히 차오르는 연출이 된다.
+// 정답 후 채색 마무리 — 완성 이모지를 선 아래(destination-over)에 전체로
+// 깔아 준다. 색칠 단계 전에 맞히면 여기서 처음 색이 들어온다.
 export function paintCatchmindColorIn(reveal, alpha = 1) {
   if (!reveal) return;
   const { ctx } = reveal;

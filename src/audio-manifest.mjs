@@ -154,6 +154,26 @@ const delivery = Object.fromEntries(
   ])
 );
 
+// 슥삭 그림 퀴즈 — 그리기 단계 안내 5 + 구제 + 피날레. 오답은 공용 retry-1~3,
+// 정답 칭찬은 공용 cheer-1~4를 재사용한다.
+const catchmind = Object.fromEntries(
+  [
+    "catchmind-intro",
+    "catchmind-guess",
+    "catchmind-form",
+    "catchmind-finish",
+    "catchmind-done",
+    "catchmind-rescue",
+    "catchmind-finale"
+  ].map(key => [
+    key,
+    {
+      ko: `assets/audio/voice/ko/${key}.mp3`,
+      en: `assets/audio/voice/en/${key}.mp3`
+    }
+  ])
+);
+
 export const VOICE = Object.freeze({
   "prompt-count": { ko: "assets/audio/voice/ko/prompt-count.mp3" },
   "prompt-add": { ko: "assets/audio/voice/ko/prompt-add.mp3" },
@@ -167,6 +187,7 @@ export const VOICE = Object.freeze({
   ...subway,
   ...paint,
   ...delivery,
+  ...catchmind,
   ...numbers,
   ...Object.fromEntries(
     Array.from({ length: 4 }, (_, index) => [

@@ -2512,6 +2512,7 @@ function startCatchmind(stage = catchmindStage) {
   setPhase("playing");
   audio.playSfx("jingle");
   showHint("스케치만 보고 맞히면 별 3개!");
+  void audio.playPrompt("catchmind-intro");
   scheduleCatchmindTick();
 }
 
@@ -2543,25 +2544,37 @@ function handleCatchmindEvents(events) {
   for (const event of events) {
     switch (event.type) {
       case "step-done":
-        // 한 단계를 다 그리고 펜을 내려놓는 작은 신호.
+        // 한 단계를 다 그리고 펜을 내려놓는 작은 신호 + 물음 낭독.
         audio.playSfx("key");
+        audio.cancel();
+        void audio.playPrompt(event.final ? "catchmind-done" : "catchmind-guess");
         if (!event.final) showHint("무슨 그림일까요? 못 맞히면 더 그려 줄게요");
         break;
       case "step":
         // 8초 안에 못 맞혀서 다음 단계를 그리기 시작한다.
         audio.playSfx("pop");
+        audio.cancel();
+        void audio.playPrompt(
+          event.step === 2 ? "catchmind-form" : "catchmind-finish"
+        );
         showHint(
           event.step === 2
-            ? "이번엔 형태를 잡아 볼게요!"
-            : "이제 그림으로 완성할게요!"
+            ? "이번엔 자세히 그려 볼게요!"
+            : "이제 색칠해 볼게요!"
         );
         break;
       case "rescue-pulse":
         audio.playSfx("bell");
+        audio.cancel();
+        void audio.playPrompt("catchmind-rescue");
         showHint("반짝이는 카드를 눌러 봐요!");
         break;
       case "wrong": {
-        audio.playSfx("wrong");
+        audio.cancel();
+        playRetryCue(
+          audio,
+          `retry-${Math.min(state.catchmind.wrong.length, 3)}`
+        );
         const card = state.catchmindScene?.querySelector(
           `[data-cm-card="${event.index}"]`
         );
@@ -2584,6 +2597,7 @@ function startCatchmindCelebrate({ stars, item }) {
   dom.hint.className = "toast";
   dom.hint.textContent = "";
   audio.playSfx("win");
+  void audio.playVoice(`cheer-${1 + (model.roundIndex % 4)}`);
   state.stars += stars;
   dom.stars.textContent = String(state.stars);
   updateCatchmindScene(state.catchmindScene, model);
@@ -2646,6 +2660,8 @@ function showCatchmindResult() {
   dom.stage.replaceChildren(scene);
   dom.problem.textContent = `다 맞혔어요! 별 ${model.totalStars}개`;
   audio.playSfx("jingle");
+  audio.cancel();
+  void audio.playPrompt("catchmind-finale");
   scene.querySelector("[data-cm-action='next']")?.focus?.();
 }
 

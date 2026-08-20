@@ -383,6 +383,15 @@ EN = {
 }
 
 
+KO_CATCHMIND = {
+    "catchmind-intro": "무슨 그림인지 맞혀 봐요! 스케치만 보고 맞히면 별이 세 개!",
+    "catchmind-guess": "무슨 그림일까요?",
+    "catchmind-form": "이번엔 자세히 그려 볼게요!",
+    "catchmind-finish": "이제 색칠해 볼게요!",
+    "catchmind-done": "색칠 끝! 무슨 그림일까요?",
+    "catchmind-rescue": "반짝반짝! 빛나는 카드를 눌러 봐요!",
+    "catchmind-finale": "오늘의 그림 퀴즈를 다 맞혔어요! 정말 멋져요!",
+}
 KO_DELIVERY = {
     "delivery-intro": "택배가 왔어요! 목표 호수로 배달해요.",
     "delivery-blocked": "그쪽은 길이 아니에요. 다시 만들어 봐요.",
@@ -400,6 +409,15 @@ KO_DELIVERY = {
     "delivery-parcel-toy": "장난감 상자",
 }
 
+EN_CATCHMIND = {
+    "catchmind-intro": "Guess what I'm drawing! Three stars if you get it from the sketch!",
+    "catchmind-guess": "What could it be?",
+    "catchmind-form": "Now let me draw the details!",
+    "catchmind-finish": "Time to color it in!",
+    "catchmind-done": "All colored! What did I draw?",
+    "catchmind-rescue": "Tap the sparkling card!",
+    "catchmind-finale": "You guessed all the pictures! Amazing!",
+}
 EN_DELIVERY = {
     "delivery-intro": "A parcel is here! Drive it to the right home.",
     "delivery-blocked": "That way is blocked. Try another path.",
@@ -443,12 +461,14 @@ async def main():
     await render_pack("ko", KO_SUBWAY, KO_VOICE, "-5%", "+2Hz")
     await render_pack("ko", KO_PAINT, KO_VOICE, "-4%", "+3Hz")
     await render_pack("ko", KO_DELIVERY, KO_VOICE, "-4%", "+3Hz")
+    await render_pack("ko", KO_CATCHMIND, KO_VOICE, "-4%", "+3Hz")
     await render_pack("en", EN_PROMPTS, EN_VOICE, "-4%", "+0Hz")
     await render_pack("en", EN_SAFETY, EN_VOICE, "-5%", "+2Hz")
     await render_pack("en", EN_SRT, EN_VOICE, "-5%", "+2Hz")
     await render_pack("en", EN_SUBWAY, EN_VOICE, "-5%", "+2Hz")
     await render_pack("en", EN_PAINT, EN_VOICE, "-4%", "+3Hz")
     await render_pack("en", EN_DELIVERY, EN_VOICE, "-4%", "+3Hz")
+    await render_pack("en", EN_CATCHMIND, EN_VOICE, "-4%", "+3Hz")
     await render_pack("en", EN, EN_VOICE, "+4%", "+7Hz")
 
 

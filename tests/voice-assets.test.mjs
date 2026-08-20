@@ -54,6 +54,12 @@ const deliveryKeys = [
   "delivery-parcel-ok", "delivery-finale",
   "delivery-parcel-fruit", "delivery-parcel-cosmetic", "delivery-parcel-toy"
 ];
+// 슥삭 그림 퀴즈 — 그리기 단계 안내 5 + 구제 + 피날레(ko·en).
+const catchmindKeys = [
+  "catchmind-intro", "catchmind-guess", "catchmind-form",
+  "catchmind-finish", "catchmind-done", "catchmind-rescue",
+  "catchmind-finale"
+];
 const ko = [
   "prompt-count", "prompt-add", "prompt-sub", "prompt-mul",
   ...Array.from({ length: 150 }, (_, i) => `number-${i + 1}`),
@@ -67,7 +73,8 @@ const ko = [
   ...srtKeys,
   ...subwayKeys,
   ...paintKeys,
-  ...deliveryKeys
+  ...deliveryKeys,
+  ...catchmindKeys
 ];
 const en = [
   "prompt-sub",
@@ -80,6 +87,7 @@ const en = [
   ...subwayKeys,
   ...paintKeys,
   ...deliveryKeys,
+  ...catchmindKeys,
   ...Array.from({ length: 150 }, (_, i) => `number-${i + 1}`)
 ];
 
