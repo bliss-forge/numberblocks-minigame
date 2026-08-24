@@ -38,6 +38,10 @@ KO_SAFETY = {
     "safety-look-both": "멈춰요, 왼쪽 오른쪽을 봐요!",
     "safety-tour": "학교까지 안전하게 가 보자!",
     "safety-take-the-bus": "여기는 버스를 타고 건너요! 정류장으로 가요.",
+    "safety-wrong-bus": "이 버스가 아니에요! 우리가 탈 버스 번호를 다시 봐요.",
+    "safety-bus-stop": "버스가 서면 버스 쪽으로 방향키를 눌러 타요!",
+    "safety-bus-boarded": "버스를 탔어요! 자리에 앉아서 가요.",
+    "safety-next-station": "열 친구를 만나러 기차역으로 가요.",
 }
 EN_SAFETY = {
     "safety-next-2": "Let's visit Numberblock Two at the nursery.",
@@ -60,6 +64,10 @@ EN_SAFETY = {
     "safety-look-both": "Stop! Look left and right!",
     "safety-tour": "Let's walk safely to school!",
     "safety-take-the-bus": "We cross here by bus! Let's go to the bus stop.",
+    "safety-wrong-bus": "That's not our bus! Let's check the number again.",
+    "safety-bus-stop": "When the bus stops, press the arrow key towards it to get on!",
+    "safety-bus-boarded": "We're on the bus! Let's sit down and ride.",
+    "safety-next-station": "Let's find Numberblock Ten at the train station.",
 }
 KO_SRT = {
     "srt-arrive": "수서역에 도착하였어요!",

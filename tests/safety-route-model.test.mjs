@@ -8,6 +8,7 @@ import {
   findSafetyPath,
   validateSafetyRouteMap
 } from "../src/safety-route-model.mjs";
+import { safetyCueForEvent } from "../src/safety-route-controller.mjs";
 
 const pointKey = ({ x, y }) => `${x},${y}`;
 const directions = Object.freeze([
@@ -668,10 +669,14 @@ test("정류장에서 선 목표 버스 쪽으로 방향키를 누르면 타고,
         : mover
     )
   };
+  // 오답 버스는 전용 이벤트로 나간다. 예전에는 take-the-bus 로 떨어져 이미
+  // 정류장에 선 아이에게 "정류장으로 가요"라는 정반대 안내를 했다(심층 검토 P1-10).
   const wrongPressed = attemptSafetyMove(wrongWaiting, "right");
   assert.equal(wrongPressed.event.type, "blocked");
-  assert.equal(wrongPressed.event.reason, "take-the-bus");
-  assert.equal(wrongPressed.state.riding, null);
+  assert.equal(wrongPressed.event.reason, "wrong-bus");
+  assert.equal(wrongPressed.event.number, otherPath.number, "어느 버스인지 실어 보낸다");
+  assert.equal(wrongPressed.event.target, base.map.busTarget, "탈 버스 번호도 함께");
+  assert.equal(wrongPressed.state.riding, null, "오답 버스에는 타지 않는다");
 });
 
 test("건너편 10번 친구를 데리러 하차 정류장에서 같은 버스를 타고 돌아온다", () => {
@@ -725,4 +730,27 @@ test("친구 2~5를 만나기 전에는 버스에 타지 않는다", () => {
   assert.equal(pressed.event.type, "blocked");
   assert.equal(pressed.event.reason, "left-friends-first");
   assert.equal(pressed.state.riding, null);
+});
+
+test("버스 안내 세 가지는 모두 음성을 갖는다 — 글만으로는 전달되지 않는다", () => {
+  // 심층 검토 P1-10: bus-stop·bus-boarded 는 voiceKey: null 이었고, 오답 버스는
+  // 안내 자체가 정반대였다. 글 못 읽는 아이에게 조작법 전달 수단이 0이었다.
+  const stop = safetyCueForEvent({ type: "bus-stop", target: 101 }, 6);
+  assert.equal(stop.voiceKey, "safety-bus-stop");
+  const boarded = safetyCueForEvent({ type: "bus-boarded", number: 101 }, 6);
+  assert.equal(boarded.voiceKey, "safety-bus-boarded");
+  const wrong = safetyCueForEvent(
+    { type: "blocked", reason: "wrong-bus", number: 85, target: 101 }, 6);
+  assert.equal(wrong.voiceKey, "safety-wrong-bus");
+  assert.match(wrong.message, /85번이에요/);
+  assert.match(wrong.message, /101번을 타요/);
+});
+
+test("도전 지도의 목표 안내는 학교가 아니라 기차역을 말한다", () => {
+  // 심층 검토 P1-7: 실제 목적지는 수서역인데 모든 안내가 "학교"였다.
+  const school = safetyCueForEvent({ type: "friend", number: 10 }, 11, "school");
+  assert.equal(school.voiceKey, "safety-next-10");
+  const station = safetyCueForEvent({ type: "friend", number: 10 }, 11, "station");
+  assert.equal(station.voiceKey, "safety-next-station");
+  assert.match(station.message, /기차역/);
 });

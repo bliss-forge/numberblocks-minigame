@@ -912,7 +912,8 @@ function moveSafetyRoute(direction) {
     return result.event;
   }
 
-  const cue = safetyCueForEvent(result.event, state.safety.nextFriend);
+  const cue = safetyCueForEvent(result.event, state.safety.nextFriend,
+    state.safety?.map?.srtMode ? "station" : "school");
   playSafetyCueVoice(cue?.voiceKey ?? null);
   if (!cue) return result.event;
   showHint(cue.message);

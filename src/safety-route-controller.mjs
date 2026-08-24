@@ -71,14 +71,23 @@ export function acceptSafetyRepeat({
   return !repeat || nowMs - previousMs >= intervalMs;
 }
 
-export function safetyCueForEvent(event, nextFriend) {
+export function safetyCueForEvent(event, nextFriend, goal = "school") {
   if (!event) return null;
+
+  if (event.type === "blocked" && event.reason === "wrong-bus") {
+    return {
+      message: `이 버스는 ${event.number}번이에요. 우리는 ${event.target}번을 타요!`,
+      voiceKey: "safety-wrong-bus",
+      tone: "guide"
+    };
+  }
 
   if (event.type === "bus-stop") {
     return {
       message:
         `${event.target}번 버스가 서면 버스 쪽으로 방향키를 눌러 타요!`,
-      voiceKey: null,
+      // 조작법을 글로만 주면 글 못 읽는 아이에게는 전달 수단이 0이다(P1-10).
+      voiceKey: "safety-bus-stop",
       tone: "guide"
     };
   }
@@ -86,7 +95,7 @@ export function safetyCueForEvent(event, nextFriend) {
   if (event.type === "bus-boarded") {
     return {
       message: `${event.number}번 버스를 탔어요!`,
-      voiceKey: null,
+      voiceKey: "safety-bus-boarded",
       tone: "success"
     };
   }
@@ -107,11 +116,19 @@ export function safetyCueForEvent(event, nextFriend) {
           voiceKey: `safety-next-${nextFriend}`,
           tone: "success"
         }
-      : {
-          message: "친구들을 모두 만났어요. 이제 학교로 가요!",
-          voiceKey: "safety-next-10",
-          tone: "success"
-        };
+      : goal === "station"
+        ? {
+            // 도전 지도의 목표는 학교가 아니라 기차역이다. 글은 그대로 두고
+            // 음성이 실제 목적지를 말하게 한다(대장 지시 2026-08-20).
+            message: "친구들을 모두 만났어요. 이제 기차역으로 가요!",
+            voiceKey: "safety-next-station",
+            tone: "success"
+          }
+        : {
+            message: "친구들을 모두 만났어요. 이제 학교로 가요!",
+            voiceKey: "safety-next-10",
+            tone: "success"
+          };
   }
 
   if (event.type === "blocked") {

@@ -210,6 +210,26 @@ export function attemptSafetyMove(state, direction) {
     }
   }
 
+  // 목표가 아닌 버스에 올라타려 할 때. 예전에는 아래 take-the-bus 로 떨어져
+  // 이미 정류장에 선 아이에게 "정류장으로 가요"라는 정반대 안내를 했다
+  // (심층 검토 P1-10). 번호를 실어 보내 어느 버스인지 짚어 준다.
+  if (state.map.busMode && !state.riding && state.nextFriend > 5) {
+    const wrongPath = state.map.trafficPaths.find(path => {
+      if (path.type !== "bus" || path.number === state.map.busTarget) return false;
+      const mover = state.movers.find(item => item.id === path.id);
+      return mover?.stopped &&
+        samePoint(path.points[mover.pathIndex], candidate);
+    });
+    if (wrongPath) {
+      return transition(state, { ...state.position }, {
+        type: "blocked",
+        reason: "wrong-bus",
+        number: wrongPath.number,
+        target: state.map.busTarget
+      });
+    }
+  }
+
   const crossing = crossingForPoint(state.map, candidate);
   if (crossing) {
     const firstRoadColumn = Math.min(...crossing.cells.map(cell => cell.x));
