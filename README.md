@@ -4,10 +4,10 @@
 
 **숫자블록 친구들과 세고, 더하고, 길을 찾고, 지하철을 갈아타는 네다섯 살의 첫 웹 게임**
 
-[![놀이](https://img.shields.io/badge/놀이-9종-4DB6E2?style=flat-square)](#아홉-가지-놀이)
-[![테스트](https://img.shields.io/badge/테스트-712개-7BC67B?style=flat-square)](#테스트)
+[![놀이](https://img.shields.io/badge/놀이-10종-4DB6E2?style=flat-square)](#열-가지-놀이)
+[![테스트](https://img.shields.io/badge/테스트-754개-7BC67B?style=flat-square)](#테스트)
 [![의존성](https://img.shields.io/badge/의존성-0-F2A65A?style=flat-square)](#어떻게-만들어졌나)
-[![음성](https://img.shields.io/badge/한국어·영어_음성-630개-C79BE0?style=flat-square)](#소리와-음성)
+[![음성](https://img.shields.io/badge/한국어·영어_음성-644개-C79BE0?style=flat-square)](#소리와-음성)
 [![안내방송](https://img.shields.io/badge/실제_지하철_안내방송-62개_역-9BB7E0?style=flat-square)](#지하철-안내방송-정리)
 [![배포](https://img.shields.io/badge/GitHub_Pages-배포중-6FC7B6?style=flat-square)](https://bliss-forge.github.io/numberblocks-minigame/)
 
@@ -33,14 +33,14 @@ cd numberblocks-minigame
 python3 -m http.server 8000     # 아무 정적 서버나 괜찮습니다
 open http://localhost:8000
 
-npm test                        # 테스트 712개
+npm test                        # 테스트 754개
 ```
 
 `file://` 로 직접 열면 ES 모듈이 막히니 꼭 서버로 띄워 주세요.
 
 ---
 
-## 아홉 가지 놀이
+## 열 가지 놀이
 
 홈에서는 <kbd>←</kbd> <kbd>→</kbd> 로 카드를 옮겨 다니다 <kbd>⎵</kbd> 로 들어갑니다. 클릭·터치도 됩니다.
 카드 번호와 캐릭터 번호는 항상 같습니다.
@@ -56,6 +56,7 @@ npm test                        # 테스트 712개
 | 7 | **칙칙폭폭 기관사** | 직접 기차를 몰고 부산까지 갑니다 | 7 |
 | 8 | **알록달록 물감 놀이** | 물감을 섞어 새 색을 만듭니다 | 8 |
 | 9 | **택배 왔어요!** | 택배차를 몰고 문 앞까지 배달합니다 | 9 |
+| 10 | **슥삭 그림 퀴즈** | 그려지는 그림을 보고 무엇인지 맞힙니다 | 10 |
 
 난이도는 쉬움 · 차근차근 · 도전 세 단계이고, 고른 값은 다음에 켤 때도 남습니다.
 
@@ -182,7 +183,7 @@ SRT 실사 모션은 도심·들판·산·강·바다·터널의 **완성 장면
 
 | 종류 | 내용 |
 | --- | --- |
-| 안내 음성 | 한국어 320개 · 영어 310개 (`assets/audio/voice/`) |
+| 안내 음성 | 한국어 327개 · 영어 317개 (`assets/audio/voice/`) |
 | 지하철 안내방송 | 실제 서울 지하철 도착 안내 62개 역 + 발빠짐 주의·출입문 예고·도착 멜로디 |
 | 음소거 | 화면 오른쪽 위 **소리** 버튼 하나로 전부 끕니다 |
 
@@ -236,7 +237,7 @@ assets/
   audio/voice/{ko,en}/      안내 음성
 subway_sound/               실제 지하철 안내방송
 scripts/                    캐릭터 렌더·음성 생성·안내방송 정리
-tests/                      테스트 54개 파일
+tests/                      테스트 57개 파일
 docs/                       설계 문서와 작업 계획
 ```
 
@@ -260,7 +261,7 @@ npm test        # node --test tests/*.test.mjs
 
 브라우저 없이 도는 순수 노드 테스트입니다. DOM이 필요한 곳은 가짜 엘리먼트로 대신합니다.
 문제 생성과 채점, 안전길 이동과 신호등, 지하철 경로와 환승, 장면 렌더 계약, 홈 카드 계약,
-반응형 스타일, 음성 자산 존재 여부까지 **712개**가 확인합니다.
+반응형 스타일, 음성 자산 존재 여부까지 **754개**가 확인합니다.
 
 ---
 
