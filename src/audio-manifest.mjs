@@ -28,7 +28,8 @@ const safety = Object.fromEntries(
     "safety-wrong-bus",
     "safety-bus-stop",
     "safety-bus-boarded",
-    "safety-next-station"
+    "safety-next-station",
+    "safety-cross-now"
   ].map(key => [
     key,
     {

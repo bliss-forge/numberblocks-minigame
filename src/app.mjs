@@ -47,6 +47,7 @@ import {
   attemptSafetyMove,
   busStopForNextTarget,
   createSafetyRouteState,
+  crossingClearance,
   findSafetyPath
 } from "./safety-route-model.mjs";
 import {
@@ -688,9 +689,26 @@ function scheduleSafetyWorldTick(previousMs = performance.now()) {
     if (wasRiding && !state.safety.riding) {
       showHint("정류장에 도착했어요! 이제 친구들을 만나러 가요");
     }
+    announceCrossingClearance();
     renderSafetyRoute();
     scheduleSafetyWorldTick(nowMs);
   }, 100);
+}
+
+// 무신호 횡단보도에서 차가 정지선에 서면 한 번만 "지금 건너요"라고 알린다.
+// 막는 안내만 있던 시절에는 아이가 언제 건널지 몰라 계속 기다렸다(P1-12).
+function announceCrossingClearance() {
+  if (!state.safety || !state.safetyView) return;
+  const clearance = crossingClearance(state.safety);
+  const readyId = clearance.waiting && clearance.safe
+    ? clearance.crossingId
+    : null;
+  if (readyId === state.safetyView.crossReadyId) return;
+  state.safetyView.crossReadyId = readyId;
+  if (!readyId) return;
+  const cue = safetyCueForEvent({ type: "cross-now" }, state.safety.nextFriend);
+  showHint(cue.message);
+  playSafetyCueVoice(cue.voiceKey);
 }
 
 function startSafetyRoute() {

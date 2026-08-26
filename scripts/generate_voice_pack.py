@@ -42,6 +42,7 @@ KO_SAFETY = {
     "safety-bus-stop": "버스가 서면 버스 쪽으로 방향키를 눌러 타요!",
     "safety-bus-boarded": "버스를 탔어요! 자리에 앉아서 가요.",
     "safety-next-station": "열 친구를 만나러 기차역으로 가요.",
+    "safety-cross-now": "차가 멈췄어요. 손을 들고 천천히 건너요!",
 }
 EN_SAFETY = {
     "safety-next-2": "Let's visit Numberblock Two at the nursery.",
@@ -68,6 +69,7 @@ EN_SAFETY = {
     "safety-bus-stop": "When the bus stops, press the arrow key towards it to get on!",
     "safety-bus-boarded": "We're on the bus! Let's sit down and ride.",
     "safety-next-station": "Let's find Numberblock Ten at the train station.",
+    "safety-cross-now": "The car has stopped. Raise your hand and cross slowly!",
 }
 KO_SRT = {
     "srt-arrive": "수서역에 도착하였어요!",
