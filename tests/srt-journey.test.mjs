@@ -1,18 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { VOICE } from "../src/audio-manifest.mjs";
 import {
-  SPLASH_MESSAGES,
-  SPLASH_STEP_MS,
-  SRT_STATIONS,
-  RIDE_DOOR,
-  RIDE_SEAT,
   advanceSrtWorld,
   attemptSrtMove,
   createSrtJourney,
+  RIDE_DOOR,
+  RIDE_SEAT,
+  SEAT_ROWS,
   seatCell,
   seatInfo,
+  SPLASH_MESSAGES,
+  SPLASH_STEP_MS,
   splashStep,
+  SRT_CARS,
+  SRT_STATIONS,
+  TARGET_SEAT_LETTERS,
   targetSeatName,
+  ticketVoiceKeys,
   trainWalkable
 } from "../src/srt-journey.mjs";
 
@@ -186,4 +191,24 @@ test("모양과 번호판이 모두 맞는 차를 골라야 성공한다", () =>
   assert.equal(found.event.type, "car-found");
   assert.equal(found.event.plate, targetPlate);
   assert.equal(found.state.phase, "done");
+});
+
+// 심층 검토 P1-11. "1호차 2C"는 글을 못 읽는 아이에게 아무 정보가 아니었다.
+test("승차권은 호차와 자리를 나눠 음성 키로 읽어 준다", () => {
+  assert.deepEqual(
+    ticketVoiceKeys({ car: 1, row: 2, letter: "C" }),
+    ["srt-car-1", "srt-seat-2c"]
+  );
+  assert.deepEqual(ticketVoiceKeys(null), []);
+
+  // 나올 수 있는 목표는 전부 등재된 음성이어야 한다 — 하나라도 빠지면 무음이다.
+  for (let car = 1; car <= SRT_CARS; car += 1) {
+    for (let row = 1; row <= SEAT_ROWS; row += 1) {
+      for (const letter of TARGET_SEAT_LETTERS) {
+        for (const key of ticketVoiceKeys({ car, row, letter })) {
+          assert.ok(VOICE[key], `${key} 가 매니페스트에 없다`);
+        }
+      }
+    }
+  }
 });

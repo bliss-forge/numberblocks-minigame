@@ -838,3 +838,31 @@ test("아이가 멀리 있으면 자동차는 양보하지 않고 계속 달린�
   );
   assert.equal(crossingClearance(state).crossingId, null);
 });
+
+test("다 건넌 아이에게는 건너라는 안내를 다시 하지 않는다", () => {
+  const base = createSafetyRouteState("easy", { seed: 4 });
+  const cells = [...base.map.crossings[0].cells].sort((a, b) => a.x - b.x);
+  const exitX = cells[cells.length - 1].x + 1;
+  const target = base.map.friends.find(friend => friend.number === 6) ??
+    base.map.goal;
+  assert.ok(target.x > base.map.zones.road.x, "6 친구는 건너편에 있다");
+
+  const crossed = {
+    ...base,
+    nextFriend: 6,
+    collected: [1, 2, 3, 4, 5],
+    crossingId: null,
+    position: { x: exitX, y: cells[0].y },
+    movers: base.movers.map(mover =>
+      mover.type === "car" ? { ...mover, stopped: true, pathIndex: 8 } : mover
+    )
+  };
+  assert.equal(crossingClearance(crossed).crossingId, null);
+
+  const beforeCrossing = { ...crossed, position: { x: cells[0].x - 1, y: cells[0].y } };
+  assert.equal(
+    crossingClearance(beforeCrossing).crossingId,
+    base.map.crossings[0].id,
+    "건너기 전에는 그대로 안내한다"
+  );
+});

@@ -139,6 +139,15 @@ function crossingWaitFor(state) {
     return map.crossings.find(item => item.id === state.crossingId) ?? null;
   }
   const position = state.position;
+  // 건널 이유가 있을 때만이다. 다 건넌 아이가 건너편 인도에 서 있어도 "지금
+  // 건너요"가 다시 나오던 것을 브라우저 로그에서 잡았다(2026-08-27).
+  const roadX = map.zones?.road?.x;
+  const target = map.friends.find(item => item.number === state.nextFriend) ??
+    map.goal;
+  if (Number.isFinite(roadX) && target &&
+    (position.x < roadX) === (target.x < roadX)) {
+    return null;
+  }
   return map.crossings.find(crossing => {
     const firstRoadColumn = Math.min(...crossing.cells.map(cell => cell.x));
     // 아직 이 동네 친구를 다 못 만났으면 건널 차례가 아니다 — 차도 안 선다.

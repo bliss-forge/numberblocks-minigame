@@ -11,6 +11,23 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { VOICE } from "../src/audio-manifest.mjs";
+import {
+  SEAT_ROWS,
+  SRT_CARS,
+  TARGET_SEAT_LETTERS,
+  ticketVoiceKeys
+} from "../src/srt-journey.mjs";
+
+// 넷째 경로(2026-08-27, P1-11): 승차권 음성은 문자열이 아니라 목표 좌석에서
+// 계산된다. 가능한 목표를 전부 돌려 실제로 불릴 키 집합을 얻는다.
+const ticketKeys = new Set();
+for (let car = 1; car <= SRT_CARS; car += 1) {
+  for (let row = 1; row <= SEAT_ROWS; row += 1) {
+    for (const letter of TARGET_SEAT_LETTERS) {
+      ticketVoiceKeys({ car, row, letter }).forEach(key => ticketKeys.add(key));
+    }
+  }
+}
 
 const generatorSource = await readFile(
   new URL("../scripts/generate_voice_pack.py", import.meta.url), "utf8");
@@ -47,7 +64,12 @@ function appVoiceKeys() {
     for (const call of source.matchAll(/play(?:Prompt|SrtVoice)\("(srt-[\w-]+)"\)/g)) {
       keys.add(call[1]);
     }
+    // playSrtSequence([...]) 안의 문자열도 실제 재생 경로다.
+    for (const call of source.matchAll(/playSrtSequence\(\[([^\]]*)\]/g)) {
+      for (const key of call[1].matchAll(/"(srt-[\w-]+)"/g)) keys.add(key[1]);
+    }
   }
+  ticketKeys.forEach(key => keys.add(key));
   for (const name of ["SRT_SPLASH_VOICES", "SRT_STATION_VOICES"]) {
     const block = appSource.match(new RegExp(`const ${name} = [\\[{]([\\s\\S]*?)[\\]}];`));
     assert.ok(block, `${name} 정의가 없다`);

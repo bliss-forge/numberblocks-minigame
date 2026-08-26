@@ -3654,6 +3654,76 @@ body[data-mode="safety"] .stage-lights {
   z-index: 3;
 }
 
+/* 승차권. 아이가 아는 넘버블록 친구로 호차를, 좌석에 적힌 것과 같은 글자로
+   자리를 알려 준다 — 글을 못 읽어도 눈으로 맞출 수 있게(심층 검토 P1-11). */
+.srt-ticket {
+  position: absolute;
+  top: 6px;
+  right: 14px;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px 6px 8px;
+  border: 4px solid #5b2d86;
+  border-radius: 16px;
+  background: #fffdf5;
+  box-shadow: 0 4px 0 rgba(37, 52, 93, .18);
+}
+
+.srt-ticket-head {
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: #5b2d86;
+  color: #fff;
+  font-size: clamp(11px, 1.1vw, 14px);
+  font-weight: 900;
+}
+
+.srt-ticket-car {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.srt-ticket-friend {
+  width: clamp(28px, 2.8vw, 40px);
+  height: auto;
+}
+
+.srt-ticket-car-label {
+  color: #5b2d86;
+  font-size: clamp(15px, 1.6vw, 22px);
+  font-weight: 900;
+}
+
+.srt-ticket-seat {
+  padding: 1px 14px;
+  border-radius: 12px;
+  background: #7c5cd6;
+  color: #fff;
+  font-size: clamp(22px, 2.6vw, 36px);
+  font-weight: 900;
+  letter-spacing: .06em;
+  box-shadow: inset 0 -5px 0 rgba(0, 0, 0, .18);
+}
+
+.srt-car-banner[data-target="true"] {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  top: 2px;
+  padding: 2px 10px 2px 4px;
+  border: 3px solid #5b2d86;
+  background: #ffd34d;
+  color: #4a2f00;
+}
+
+.srt-car-friend {
+  width: 22px;
+  height: auto;
+}
+
 .srt-player {
   grid-column: var(--srt-x);
   grid-row: var(--srt-y);

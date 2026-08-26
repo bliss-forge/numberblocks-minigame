@@ -87,7 +87,20 @@ const srt = Object.fromEntries(
     "srt-wrong-station",
     "srt-parking",
     "srt-wrong-car",
-    "srt-grandparents"
+    "srt-grandparents",
+    "srt-car-1",
+    "srt-car-2",
+    "srt-car-3",
+    "srt-car-4",
+    "srt-car-5",
+    "srt-seat-1b",
+    "srt-seat-1c",
+    "srt-seat-2b",
+    "srt-seat-2c",
+    "srt-seat-3b",
+    "srt-seat-3c",
+    "srt-seat-4b",
+    "srt-seat-4c"
   ].map(key => [
     key,
     {
