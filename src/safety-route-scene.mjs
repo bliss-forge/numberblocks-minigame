@@ -1,5 +1,6 @@
 import { characterAsset } from "./character-spec.mjs";
 import { moverPoint } from "./safety-route-movers.mjs";
+import { crossingClearance } from "./safety-route-model.mjs";
 import {
   bicycleSvg,
   busShelterSvg,
@@ -201,6 +202,7 @@ export function renderSafetyRouteScene(document, state, requestedView = {}) {
     )
   );
   const alleyKeys = cellsIn(state.map.alleys);
+  const crossingNodes = new Map();
   state.map.roadCells.forEach(point => {
     const crossingId = crossingIds.get(pointKey(point));
     const className = crossingId
@@ -214,7 +216,12 @@ export function renderSafetyRouteScene(document, state, requestedView = {}) {
     node.dataset.roadPosition = [
       "outer-left", "center-left", "center-right", "outer-right"
     ][point.x - state.map.zones.road.x] ?? "";
-    if (crossingId) node.dataset.crossingId = crossingId;
+    if (crossingId) {
+      node.dataset.crossingId = crossingId;
+      const group = crossingNodes.get(crossingId) ?? [];
+      group.push(node);
+      crossingNodes.set(crossingId, group);
+    }
     world.append(node);
   });
 
@@ -484,6 +491,7 @@ export function renderSafetyRouteScene(document, state, requestedView = {}) {
     viewport,
     world,
     signalNodes: signalMarkers,
+    crossingNodes,
     moverNodes,
     friendNodes,
     player: playerWrap,
@@ -537,6 +545,17 @@ export function updateSafetyRouteScene(root, state, requestedView = {}) {
   nodes.viewport.style.setProperty("--viewport-rows", view.camera.height);
   setWorldCamera(nodes.world, view.camera);
   updateMinimap(nodes.minimap, state);
+
+  // 글을 못 읽는 아이에게 "지금 건너도 된다"를 보여 준다 — 차가 정지선에 서면
+  // 그 횡단보도만 초록으로 살아난다(심층 검토 P1-12, 음성과 짝).
+  const clearance = crossingClearance(state);
+  const readyId = clearance.waiting && clearance.safe ? clearance.crossingId : "";
+  root.dataset.crossReady = readyId;
+  nodes.crossingNodes.forEach((group, crossingId) => {
+    group.forEach(node => {
+      node.dataset.crossReady = crossingId === readyId ? "true" : "";
+    });
+  });
 
   nodes.signalNodes.forEach(node => {
     node.dataset.phase = state.signal.phase;

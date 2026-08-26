@@ -42,6 +42,7 @@ KO_SAFETY = {
     "safety-bus-stop": "버스가 서면 버스 쪽으로 방향키를 눌러 타요!",
     "safety-bus-boarded": "버스를 탔어요! 자리에 앉아서 가요.",
     "safety-next-station": "열 친구를 만나러 기차역으로 가요.",
+    "safety-cross-now": "차가 멈췄어요. 손을 들고 천천히 건너요!",
 }
 EN_SAFETY = {
     "safety-next-2": "Let's visit Numberblock Two at the nursery.",
@@ -68,6 +69,7 @@ EN_SAFETY = {
     "safety-bus-stop": "When the bus stops, press the arrow key towards it to get on!",
     "safety-bus-boarded": "We're on the bus! Let's sit down and ride.",
     "safety-next-station": "Let's find Numberblock Ten at the train station.",
+    "safety-cross-now": "The car has stopped. Raise your hand and cross slowly!",
 }
 KO_SRT = {
     "srt-arrive": "수서역에 도착하였어요!",
@@ -83,6 +85,19 @@ KO_SRT = {
     "srt-parking": "할아버지 할머니 차를 찾아보아요. 그림자 모양과 번호가 같은 차예요!",
     "srt-wrong-car": "이 차가 아니에요. 모양과 번호판을 다시 봐요!",
     "srt-grandparents": "할아버지 할머니를 만났어요! 정말 잘했어요!",
+    "srt-car-1": "1호차예요.",
+    "srt-car-2": "2호차예요.",
+    "srt-car-3": "3호차예요.",
+    "srt-car-4": "4호차예요.",
+    "srt-car-5": "5호차예요.",
+    "srt-seat-1b": "1번 비 자리를 찾아요!",
+    "srt-seat-1c": "1번 씨 자리를 찾아요!",
+    "srt-seat-2b": "2번 비 자리를 찾아요!",
+    "srt-seat-2c": "2번 씨 자리를 찾아요!",
+    "srt-seat-3b": "3번 비 자리를 찾아요!",
+    "srt-seat-3c": "3번 씨 자리를 찾아요!",
+    "srt-seat-4b": "4번 비 자리를 찾아요!",
+    "srt-seat-4c": "4번 씨 자리를 찾아요!",
 }
 EN_SRT = {
     "srt-arrive": "We have arrived at Suseo Station!",
@@ -98,6 +113,19 @@ EN_SRT = {
     "srt-parking": "Let's find Grandma and Grandpa's car. Match the shadow and the number plate!",
     "srt-wrong-car": "That is not the car. Look at the shape and the number plate again!",
     "srt-grandparents": "We met Grandma and Grandpa! Well done!",
+    "srt-car-1": "Coach one.",
+    "srt-car-2": "Coach two.",
+    "srt-car-3": "Coach three.",
+    "srt-car-4": "Coach four.",
+    "srt-car-5": "Coach five.",
+    "srt-seat-1b": "Find seat one B!",
+    "srt-seat-1c": "Find seat one C!",
+    "srt-seat-2b": "Find seat two B!",
+    "srt-seat-2c": "Find seat two C!",
+    "srt-seat-3b": "Find seat three B!",
+    "srt-seat-3c": "Find seat three C!",
+    "srt-seat-4b": "Find seat four B!",
+    "srt-seat-4c": "Find seat four C!",
 }
 KO_SUBWAY = {
     "subway-board": "지하철을 탔어요! 출발해요!",

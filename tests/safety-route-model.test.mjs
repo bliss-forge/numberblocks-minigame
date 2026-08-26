@@ -5,6 +5,7 @@ import {
   advanceSafetyWorld,
   attemptSafetyMove,
   createSafetyRouteState,
+  crossingClearance,
   findSafetyPath,
   validateSafetyRouteMap
 } from "../src/safety-route-model.mjs";
@@ -753,4 +754,115 @@ test("도전 지도의 목표 안내는 학교가 아니라 기차역을 말한�
   const station = safetyCueForEvent({ type: "friend", number: 10 }, 11, "station");
   assert.equal(station.voiceKey, "safety-next-station");
   assert.match(station.message, /기차역/);
+});
+
+// 심층 검토 P1-12. 무신호 횡단보도에는 안전한 틈이 무작위로만 생겼고, 막힐 때마다
+// "차가 지나간 다음에 건너요"라고만 안내했다. 그래서 안내를 잘 따르는 아이일수록
+// 오래 갇혔다 — 계속 누르는 아이는 3.1초, 2초씩 기다리는 아이는 29.1초가 걸렸다.
+// 실제 도로교통법(제27조)대로 차가 정지선에서 양보하게 만들어 기다림을 유한하게 한다.
+function obedientCrossingMs(difficulty, seed) {
+  let state = createSafetyRouteState(difficulty, { seed });
+  const cells = [...state.map.crossings[0].cells].sort((a, b) => a.x - b.x);
+  const entry = { x: cells[0].x - 1, y: cells[0].y };
+  const exitX = cells[cells.length - 1].x + 1;
+  state = {
+    ...state,
+    position: entry,
+    nextFriend: 6,
+    collected: [1, 2, 3, 4, 5],
+    checkedEntrance:
+      state.map.entrances.find(item => item.x === entry.x && item.y === entry.y)
+        ?.id ?? null
+  };
+  let elapsed = 0;
+  let cooldown = 0;
+  while (elapsed < 60000 && state.position.x < exitX) {
+    if (cooldown <= 0) {
+      const result = attemptSafetyMove(state, "right");
+      state = result.state;
+      // 안내를 들은 아이는 2초쯤 기다렸다가 다시 누른다
+      if (result.event.type === "blocked") cooldown = 2000;
+    } else {
+      cooldown -= 100;
+    }
+    state = advanceSafetyWorld(state, 100);
+    elapsed += 100;
+  }
+  return state.position.x >= exitX ? elapsed : Number.POSITIVE_INFINITY;
+}
+
+test("기다리라는 안내를 따르는 아이도 10초 안에 무신호 횡단보도를 건넌다", () => {
+  for (const difficulty of ["easy", "challenge"]) {
+    for (let seed = 0; seed < 6; seed += 1) {
+      const elapsed = obedientCrossingMs(difficulty, seed);
+      assert.ok(
+        elapsed <= 10000,
+        `${difficulty}/seed ${seed}: 기다리는 아이가 ${elapsed}ms 갇혔다`
+      );
+    }
+  }
+});
+
+test("횡단보도 앞에 아이가 서면 자동차가 정지선에 서고 건널 수 있다", () => {
+  const base = createSafetyRouteState("easy", { seed: 4 });
+  const cells = [...base.map.crossings[0].cells].sort((a, b) => a.x - b.x);
+  let state = {
+    ...base,
+    nextFriend: 6,
+    collected: [1, 2, 3, 4, 5],
+    position: { x: cells[0].x - 1, y: cells[0].y }
+  };
+  for (let elapsed = 0; elapsed < 3000; elapsed += 100) {
+    state = advanceSafetyWorld(state, 100);
+  }
+  const cars = state.movers.filter(mover => mover.type === "car");
+  assert.ok(
+    cars.some(mover => mover.stopped),
+    "아이가 기다리면 자동차가 정지선에 선다"
+  );
+  const clearance = crossingClearance(state);
+  assert.equal(clearance.crossingId, base.map.crossings[0].id);
+  assert.equal(clearance.safe, true, "양보가 끝나면 건널 수 있다");
+  assert.equal(attemptSafetyMove(state, "right").event.type, "crossing-started");
+});
+
+test("아이가 멀리 있으면 자동차는 양보하지 않고 계속 달린다", () => {
+  let state = createSafetyRouteState("easy", { seed: 4 });
+  for (let elapsed = 0; elapsed < 3000; elapsed += 100) {
+    state = advanceSafetyWorld(state, 100);
+  }
+  const cars = state.movers.filter(mover => mover.type === "car");
+  assert.ok(
+    cars.every(mover => !mover.stopped),
+    "빈 횡단보도에서는 차가 멈추지 않는다"
+  );
+  assert.equal(crossingClearance(state).crossingId, null);
+});
+
+test("다 건넌 아이에게는 건너라는 안내를 다시 하지 않는다", () => {
+  const base = createSafetyRouteState("easy", { seed: 4 });
+  const cells = [...base.map.crossings[0].cells].sort((a, b) => a.x - b.x);
+  const exitX = cells[cells.length - 1].x + 1;
+  const target = base.map.friends.find(friend => friend.number === 6) ??
+    base.map.goal;
+  assert.ok(target.x > base.map.zones.road.x, "6 친구는 건너편에 있다");
+
+  const crossed = {
+    ...base,
+    nextFriend: 6,
+    collected: [1, 2, 3, 4, 5],
+    crossingId: null,
+    position: { x: exitX, y: cells[0].y },
+    movers: base.movers.map(mover =>
+      mover.type === "car" ? { ...mover, stopped: true, pathIndex: 8 } : mover
+    )
+  };
+  assert.equal(crossingClearance(crossed).crossingId, null);
+
+  const beforeCrossing = { ...crossed, position: { x: cells[0].x - 1, y: cells[0].y } };
+  assert.equal(
+    crossingClearance(beforeCrossing).crossingId,
+    base.map.crossings[0].id,
+    "건너기 전에는 그대로 안내한다"
+  );
 });

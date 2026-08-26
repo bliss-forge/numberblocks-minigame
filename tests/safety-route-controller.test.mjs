@@ -137,3 +137,11 @@ test("car-close 사유는 차가 지나간 뒤 건너라는 안내를 만든다"
   assert.equal(cue.message, "차가 오고 있어요! 차가 지나간 다음에 건너요!");
   assert.equal(cue.voiceKey, "safety-car");
 });
+
+// 막는 안내만 있으면 아이는 언제 건널지 모른다. 긍정 안내도 음성을 갖는다(P1-12).
+test("차가 멈춘 순간의 안내는 글과 음성을 함께 준다", () => {
+  const cue = safetyCueForEvent({ type: "cross-now" }, 6);
+  assert.equal(cue.voiceKey, "safety-cross-now");
+  assert.equal(cue.tone, "success");
+  assert.match(cue.message, /건너/);
+});

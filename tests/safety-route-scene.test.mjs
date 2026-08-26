@@ -572,3 +572,37 @@ test("무신호 난이도 장면에는 신호등이 없고 미니맵 신호도 �
     assert.equal(byClass(scene, "route-minimap-signal")[0].hidden, true, difficulty);
   }
 });
+
+// 심층 검토 P1-12. 음성을 끈 아이도 "지금 건너도 된다"를 알아야 한다.
+test("차가 정지선에 서면 그 횡단보도만 건널 수 있다고 표시한다", () => {
+  const base = createSafetyRouteState("easy", { seed: 4 });
+  const [first, second] = base.map.crossings;
+  const cells = [...first.cells].sort((a, b) => a.x - b.x);
+  const waiting = {
+    ...base,
+    nextFriend: 6,
+    collected: [1, 2, 3, 4, 5],
+    position: { x: cells[0].x - 1, y: cells[0].y },
+    // 차를 모두 횡단보도에서 멀리 세워 둔다 = 양보가 끝난 상태
+    movers: base.movers.map(mover =>
+      mover.type === "car" ? { ...mover, stopped: true, pathIndex: 8 } : mover
+    )
+  };
+  const scene = renderSafetyRouteScene(document, waiting);
+  assert.equal(scene.dataset.crossReady, first.id);
+
+  const ready = descendants(scene)
+    .filter(node => node.dataset.crossReady === "true");
+  assert.ok(ready.length > 0, "건널 수 있는 횡단보도가 표시된다");
+  assert.ok(
+    ready.every(node => node.dataset.crossingId === first.id),
+    "아이가 서 있는 횡단보도만 초록이 된다"
+  );
+  assert.ok(
+    descendants(scene).some(node => node.dataset.crossingId === second.id),
+    "다른 횡단보도도 장면에는 있다"
+  );
+
+  updateSafetyRouteScene(scene, base);
+  assert.equal(scene.dataset.crossReady, "", "아이가 떠나면 표시가 꺼진다");
+});

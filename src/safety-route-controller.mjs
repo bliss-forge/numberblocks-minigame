@@ -100,6 +100,16 @@ export function safetyCueForEvent(event, nextFriend, goal = "school") {
     };
   }
 
+  // 막는 안내만 있으면 아이는 언제 건너야 할지 알 수 없어 무작정 기다린다.
+  // 차가 서면 건너도 된다고 말해 준다(심층 검토 P1-12).
+  if (event.type === "cross-now") {
+    return {
+      message: "차가 멈췄어요. 손을 들고 천천히 건너요!",
+      voiceKey: "safety-cross-now",
+      tone: "success"
+    };
+  }
+
   if (event.type === "crossing-started") {
     return {
       message: "멈춰요, 왼쪽 오른쪽을 봐요!",

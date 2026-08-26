@@ -91,6 +91,42 @@ function renderStationPhase(document, state, stage) {
   return null;
 }
 
+// 승차권. "1호차 2C"를 글로만 주면 글 못 읽는 아이는 80석을 찍어 볼 수밖에
+// 없었다(심층 검토 P1-11). 호차는 아이가 이미 아는 넘버블록 친구로 보여 주고,
+// 자리 번호는 좌석에 적힌 것과 똑같이 크게 적어 눈으로 맞추게 한다.
+function seatTicket(document, target) {
+  const ticket = document.createElement("div");
+  ticket.className = "srt-ticket";
+  ticket.dataset.car = String(target.car);
+  ticket.dataset.seat = `${target.row}${target.letter}`;
+  ticket.setAttribute(
+    "aria-label",
+    `내 자리는 ${target.car}호차 ${target.row}${target.letter}`
+  );
+
+  const head = document.createElement("div");
+  head.className = "srt-ticket-head";
+  head.textContent = "내 자리";
+
+  const car = document.createElement("div");
+  car.className = "srt-ticket-car";
+  const friend = document.createElement("img");
+  friend.className = "srt-ticket-friend";
+  friend.src = `assets/characters/${characterAsset(target.car)}`;
+  friend.alt = `숫자 ${target.car} 블록 친구`;
+  const carLabel = document.createElement("span");
+  carLabel.className = "srt-ticket-car-label";
+  carLabel.textContent = `${target.car}호차`;
+  car.append(friend, carLabel);
+
+  const seat = document.createElement("div");
+  seat.className = "srt-ticket-seat";
+  seat.textContent = `${target.row}${target.letter}`;
+
+  ticket.append(head, car, seat);
+  return ticket;
+}
+
 function renderSeatPhase(document, state, stage) {
   const world = document.createElement("div");
   world.className = "srt-train";
@@ -100,8 +136,21 @@ function renderSeatPhase(document, state, stage) {
   for (let car = 1; car <= SRT_CARS; car += 1) {
     const banner = document.createElement("div");
     banner.className = "srt-car-banner";
-    banner.textContent = `${car}호차`;
     banner.style.setProperty("--srt-x", 5 * (car - 1) + 2);
+    if (car === state.target.car) {
+      // 목표 호차에는 승차권과 같은 친구를 세워 둔다 — 글자 대신 얼굴로 찾는다.
+      banner.dataset.target = "true";
+      const friend = document.createElement("img");
+      friend.className = "srt-car-friend";
+      friend.src = `assets/characters/${characterAsset(car)}`;
+      friend.alt = "";
+      friend.setAttribute("aria-hidden", "true");
+      const label = document.createElement("span");
+      label.textContent = `${car}호차`;
+      banner.append(friend, label);
+    } else {
+      banner.textContent = `${car}호차`;
+    }
     world.append(banner);
   }
 
@@ -281,6 +330,9 @@ export function renderSrtJourney(document, state) {
   const stage = document.createElement("div");
   stage.className = "srt-stage";
   root.append(stage);
+  // 승차권은 열차 위 빈 띠에 둔다 — 좌석 위에 얹으면 아이가 찾아야 할 자리를
+  // 가린다(1280×720 브라우저 확인, 3A·4A가 덮였다).
+  if (state.phase === "seat") root.append(seatTicket(document, state.target));
 
   let playerLayer = null;
   if (state.phase === "station") playerLayer = renderStationPhase(document, state, stage);

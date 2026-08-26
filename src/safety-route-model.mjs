@@ -115,7 +115,11 @@ function carApproachingCrossing(state, crossing) {
     if (mover.type !== "car") return false;
     const point = moverPoint(state.map, mover);
     if (!point) return false;
+    // 횡단보도 위에 있는 차는 멈춰 있어도 길을 막는다.
     if (point.y >= top && point.y <= bottom) return true;
+    // 정지선에 선 차는 위협이 아니다 — 이게 없으면 양보한 차가 스스로
+    // "차가 오고 있어요"를 계속 띄워 아이를 가둔다(심층 검토 P1-12).
+    if (mover.stopped) return false;
     if (point.y < top - CAR_APPROACH_DISTANCE ||
       point.y > bottom + CAR_APPROACH_DISTANCE) {
       return false;
@@ -123,6 +127,47 @@ function carApproachingCrossing(state, crossing) {
     return (mover.heading === "north" && point.y > bottom) ||
       (mover.heading === "south" && point.y < top);
   });
+}
+
+// 아이가 어느 횡단보도를 건너려고 서 있는지. 무신호 지도에서 자동차가 정지선에
+// 설지, 그리고 "지금 건너요" 안내를 띄울지를 이 값 하나로 정한다.
+function crossingWaitFor(state) {
+  const map = state.map;
+  if (!map?.signalless || map.busMode) return null;
+  if (state.crossingId) {
+    // 건너는 중에는 그 횡단보도를 계속 비워 둔다.
+    return map.crossings.find(item => item.id === state.crossingId) ?? null;
+  }
+  const position = state.position;
+  // 건널 이유가 있을 때만이다. 다 건넌 아이가 건너편 인도에 서 있어도 "지금
+  // 건너요"가 다시 나오던 것을 브라우저 로그에서 잡았다(2026-08-27).
+  const roadX = map.zones?.road?.x;
+  const target = map.friends.find(item => item.number === state.nextFriend) ??
+    map.goal;
+  if (Number.isFinite(roadX) && target &&
+    (position.x < roadX) === (target.x < roadX)) {
+    return null;
+  }
+  return map.crossings.find(crossing => {
+    const firstRoadColumn = Math.min(...crossing.cells.map(cell => cell.x));
+    // 아직 이 동네 친구를 다 못 만났으면 건널 차례가 아니다 — 차도 안 선다.
+    if (position.x < firstRoadColumn && state.nextFriend <= 5) return false;
+    return crossing.cells.some(cell =>
+      Math.abs(cell.x - position.x) + Math.abs(cell.y - position.y) <= 1
+    );
+  }) ?? null;
+}
+
+// 아이가 기다리는 횡단보도와, 지금 건너도 되는지. 앱이 "지금 건너요" 음성을
+// 한 번만 틀기 위해 매 틱 읽는다.
+export function crossingClearance(state) {
+  const crossing = crossingWaitFor(state);
+  if (!crossing) return { crossingId: null, safe: false, waiting: false };
+  return {
+    crossingId: crossing.id,
+    safe: !carApproachingCrossing(state, crossing),
+    waiting: !state.crossingId
+  };
 }
 
 function transition(state, position, event, extra = {}) {
@@ -410,7 +455,17 @@ function advanceBusMover(definition, mover, { elapsedMs, ridingId }) {
   });
 }
 
-function advanceSignallessCarMover(definition, mover, { elapsedMs, player }) {
+// 차가 횡단보도 줄로 "새로" 들어서려는 순간인지. 이미 그 줄 위에 있는 차는
+// 계속 가서 횡단보도를 비워 준다 — 멈춰 서면 오히려 길을 막는다.
+function entersYieldRow(current, next, yieldRows) {
+  return yieldRows.includes(next.y) && !yieldRows.includes(current.y);
+}
+
+function advanceSignallessCarMover(
+  definition,
+  mover,
+  { elapsedMs, player, yieldRows = [] }
+) {
   const direction = mover.direction === -1 ? -1 : 1;
   const accumulated = (mover.elapsedMs ?? 0) + Math.max(0, elapsedMs);
   if (accumulated < SIGNALLESS_CAR_INTERVAL_MS) {
@@ -423,6 +478,21 @@ function advanceSignallessCarMover(definition, mover, { elapsedMs, player }) {
   }
   const pathIndex =
     (mover.pathIndex + direction + definition.points.length) % definition.points.length;
+  // 횡단보도 앞에 아이가 서 있으면 정지선에서 멈춘다(도로교통법 제27조).
+  // 무작위 틈을 기다리게 두면 안내를 따르는 아이일수록 오래 갇힌다(P1-12).
+  if (yieldRows.length &&
+    entersYieldRow(
+      definition.points[mover.pathIndex],
+      definition.points[pathIndex],
+      yieldRows
+    )) {
+    return cloneMover(definition, {
+      ...mover,
+      elapsedMs: SIGNALLESS_CAR_INTERVAL_MS,
+      stopped: true,
+      heading: definition.headings?.[mover.pathIndex] ?? mover.heading
+    });
+  }
   if (player && samePoint(definition.points[pathIndex], player)) {
     return cloneMover(definition, {
       ...mover,
@@ -476,6 +546,10 @@ export function advanceSafetyWorld(state, elapsedMs = 100) {
   const elapsed = Number.isFinite(elapsedMs) ? Math.max(0, elapsedMs) : 0;
   const tick = state.tick + elapsed;
   const signal = advanceSignal(state.signal, elapsed);
+  const waitingCrossing = crossingWaitFor(state);
+  const yieldRows = waitingCrossing
+    ? [...new Set(waitingCrossing.cells.map(cell => cell.y))]
+    : [];
   const advancedMovers = state.movers.map(mover => {
     const definition = state.map.trafficPaths.find(item => item.id === mover.id);
     if (!definition || definition.points.length === 0) return { ...mover };
@@ -494,7 +568,8 @@ export function advanceSafetyWorld(state, elapsedMs = 100) {
     if (state.map.signalless) {
       return advanceSignallessCarMover(definition, mover, {
         elapsedMs: elapsed,
-        player: state.position
+        player: state.position,
+        yieldRows
       });
     }
     return advanceCarMover(definition, mover, signal);

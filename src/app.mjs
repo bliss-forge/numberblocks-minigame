@@ -47,6 +47,7 @@ import {
   attemptSafetyMove,
   busStopForNextTarget,
   createSafetyRouteState,
+  crossingClearance,
   findSafetyPath
 } from "./safety-route-model.mjs";
 import {
@@ -69,13 +70,14 @@ import {
   tourCameraPath
 } from "./safety-route-camera.mjs";
 import {
-  SPLASH_MESSAGES,
-  SRT_STATIONS,
   advanceSrtWorld,
   attemptSrtMove,
   createSrtJourney,
+  SPLASH_MESSAGES,
   splashStep,
-  targetSeatName
+  SRT_STATIONS,
+  targetSeatName,
+  ticketVoiceKeys
 } from "./srt-journey.mjs";
 import {
   renderSrtJourney,
@@ -688,9 +690,26 @@ function scheduleSafetyWorldTick(previousMs = performance.now()) {
     if (wasRiding && !state.safety.riding) {
       showHint("정류장에 도착했어요! 이제 친구들을 만나러 가요");
     }
+    announceCrossingClearance();
     renderSafetyRoute();
     scheduleSafetyWorldTick(nowMs);
   }, 100);
+}
+
+// 무신호 횡단보도에서 차가 정지선에 서면 한 번만 "지금 건너요"라고 알린다.
+// 막는 안내만 있던 시절에는 아이가 언제 건널지 몰라 계속 기다렸다(P1-12).
+function announceCrossingClearance() {
+  if (!state.safety || !state.safetyView) return;
+  const clearance = crossingClearance(state.safety);
+  const readyId = clearance.waiting && clearance.safe
+    ? clearance.crossingId
+    : null;
+  if (readyId === state.safetyView.crossReadyId) return;
+  state.safetyView.crossReadyId = readyId;
+  if (!readyId) return;
+  const cue = safetyCueForEvent({ type: "cross-now" }, state.safety.nextFriend);
+  showHint(cue.message);
+  playSafetyCueVoice(cue.voiceKey);
 }
 
 function startSafetyRoute() {
@@ -948,6 +967,20 @@ function playSrtVoice(key) {
   void audio.playPrompt(key);
 }
 
+// 승차권을 소리로 읽어 준다. 앞 문장이 취소되면(다른 안내가 끼어들면) 뒤 문장도
+// 따라가지 않는다 — 글 못 읽는 아이에게 자리 정보를 주는 유일한 통로다(P1-11).
+function playSrtSequence(keys) {
+  audio.cancel();
+  const step = index => {
+    const key = keys[index];
+    if (!key) return;
+    void audio.playPrompt(key).then(status => {
+      if (status !== "cancelled") step(index + 1);
+    });
+  };
+  step(0);
+}
+
 function startSrtJourney() {
   stopSafetyHold();
   clearTimers();
@@ -989,6 +1022,7 @@ function scheduleSrtTick(previousMs = performance.now()) {
       }
       if (wasPhase === "station" && state.srt.phase === "seat") {
         showHint(`${targetSeatName(state.srt)} 좌석을 찾아요!`);
+        playSrtSequence(ticketVoiceKeys(state.srt.target));
       }
       if (!wasOpen && state.srt.ride.doorOpen) {
         audio.playSfx("key");
@@ -1022,7 +1056,11 @@ function moveSrt(direction) {
     playSrtVoice("srt-depart");
   } else if (event.type === "wrong-seat") {
     showHint(`여기는 ${event.seat} 좌석이에요. ${targetSeatName(state.srt)}를 찾아요!`);
-    playSrtVoice("srt-wrong-seat");
+    // 자리를 잘못 찾은 순간이 자리 번호를 다시 들려줄 자리다. 호차는 승차권과
+    // 금색 표지판이 계속 보여 주고 있으니, 음성은 자리만 짚어 짧게 끝낸다
+    // (키 하나가 한국어·영어 두 번 재생된다 — 세 키면 10초가 넘는다).
+    const [, seatKey] = ticketVoiceKeys(state.srt.target);
+    playSrtSequence(["srt-wrong-seat", seatKey]);
   } else if (event.type === "wrong-station") {
     showHint(`${event.station}역은 해당 역이 아니에요. 다시 기차에 올라타요!`);
     playSrtVoice("srt-wrong-station");

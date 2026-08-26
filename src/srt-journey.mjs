@@ -58,6 +58,16 @@ export function seatInfo(x, y) {
   return { car, row, letter, name: `${car}호차 ${row}${letter}` };
 }
 
+// 글을 못 읽는 아이에게 "1호차 2C"는 아무 정보가 아니다 — 승차권을 소리로도
+// 읽어 준다(심층 검토 P1-11). 호차와 자리를 나눠 두면 조합 40개 대신 13개면 된다.
+export function ticketVoiceKeys(target) {
+  if (!target) return [];
+  return [
+    `srt-car-${target.car}`,
+    `srt-seat-${target.row}${target.letter.toLowerCase()}`
+  ];
+}
+
 export function seatCell(target) {
   return {
     x: 5 * (target.car - 1) + target.row,
