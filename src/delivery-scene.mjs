@@ -13,6 +13,7 @@ import {
   STREAK_BONUS_SLOTS,
   parcelById,
 } from "./delivery-model.mjs";
+import { characterPngPath, characterSrcset } from "./character-image.mjs";
 import { MAP_BACKDROP, estateMapSvg } from "./delivery-estate-art.mjs";
 import {
   CABIN_BACKDROP,
@@ -26,7 +27,7 @@ import {
 import { FINALE_BACKDROP, finaleSvg } from "./delivery-finale-art.mjs";
 import { RHYTHM_BACKDROP, rhythmStageSvg } from "./delivery-rhythm-art.mjs";
 
-const MASCOT_IMAGE = "assets/characters/nine.png";
+const MASCOT_ASSET = "nine.png";
 
 // 디자인 정본 락 §1 — 단계 이름과 문구는 시트 그대로다.
 export const DELIVERY_STEPS = Object.freeze({
@@ -115,7 +116,8 @@ function header(document, step) {
 function footer(document, step, extra) {
   const foot = el(document, "footer", "dv-foot");
   const mascot = el(document, "img", "dv-mascot");
-  mascot.setAttribute("src", MASCOT_IMAGE);
+  mascot.setAttribute("src", characterPngPath(MASCOT_ASSET));
+  mascot.setAttribute("srcset", characterSrcset(MASCOT_ASSET));
   mascot.setAttribute("alt", "");
   foot.append(mascot);
 

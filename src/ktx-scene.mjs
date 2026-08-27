@@ -17,6 +17,7 @@ import {
   MAX_SPEED,
   SPEED_MILESTONES
 } from "./ktx-route-data.mjs";
+import { applyCharacterNumber, characterWebpPath } from "./character-image.mjs";
 import {
   activeEvent,
   currentBand,
@@ -87,7 +88,7 @@ function el(document, tag, className, text = null) {
 function passengerImg(document, number, className) {
   const image = document.createElement("img");
   image.className = className;
-  image.src = `assets/characters/${characterAsset(number)}`;
+  applyCharacterNumber(image, number);
   image.alt = `숫자 ${number} 블록 친구`;
   return image;
 }
@@ -719,7 +720,8 @@ function updateWindows(root, state) {
         : null;
       if (image) {
         // 창 유리 62×34 안에 정사각 34×34로 중앙 정렬(모델 v2 비율)
-        image.setAttribute("href", `assets/characters/${characterAsset(number)}`);
+        // SVG <image> 는 srcset 이 없다 — 파생본을 바로 가리킨다.
+        image.setAttribute("href", characterWebpPath(characterAsset(number)));
         image.setAttribute("x", "14");
         image.setAttribute("width", "34");
         image.setAttribute("height", "34");

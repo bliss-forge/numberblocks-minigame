@@ -1,4 +1,5 @@
 import { characterAsset } from "./character-spec.mjs";
+import { applyCharacterNumber } from "./character-image.mjs";
 import {
   FAMILY_STATIONS,
   STATION_COORDS,
@@ -95,7 +96,7 @@ function smoothPath(points) {
 function playerImage(document, className = "subway-player") {
   const image = document.createElement("img");
   image.className = className;
-  image.src = `assets/characters/${characterAsset(1)}`;
+  applyCharacterNumber(image, 1);
   image.alt = "숫자 1 블록 친구";
   return image;
 }
@@ -103,7 +104,7 @@ function playerImage(document, className = "subway-player") {
 function passengerImage(document, number, className = "subway-passenger") {
   const image = document.createElement("img");
   image.className = className;
-  image.src = `assets/characters/${characterAsset(number)}`;
+  applyCharacterNumber(image, number);
   image.alt = `숫자 ${number} 블록 친구`;
   return image;
 }

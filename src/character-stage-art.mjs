@@ -13,15 +13,16 @@
 
 import { characterAsset } from "./character-spec.mjs";
 import { CHARACTER_VISUAL_METRICS } from "./character-visual-metrics.mjs";
+import { characterWebpPath } from "./character-image.mjs";
 
-const ASSET_ROOT = "assets/characters";
+// SVG <image> 는 srcset 이 없다 — 파생본(WebP)을 바로 가리킨다.
 
 export function characterNumberFor(unit) {
   return Math.max(1, Math.min(150, Math.floor(unit)));
 }
 
 export function characterAssetPath(number) {
-  return `${ASSET_ROOT}/${characterAsset(characterNumberFor(number))}`;
+  return characterWebpPath(characterAsset(characterNumberFor(number)));
 }
 
 /**
