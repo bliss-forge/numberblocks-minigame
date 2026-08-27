@@ -6,6 +6,7 @@ import {
   isModeAvailable,
   problemKey
 } from "./game-model.mjs";
+import { applyCharacterSource } from "./character-image.mjs";
 import { AudioManager } from "./audio-manager.mjs";
 import {
   loadDifficulty,
@@ -266,7 +267,7 @@ function character(number, className = "", scene = "neutral") {
   const metric = CHARACTER_VISUAL_METRICS[number];
   const image = document.createElement("img");
   image.className = `character enter ${className}`.trim();
-  image.src = `assets/characters/${asset}`;
+  applyCharacterSource(image, asset);
   image.alt = `숫자 ${number} 블록 캐릭터`;
   image.dataset.number = String(number);
   image.dataset.sizeBand = characterSizeBand(number);

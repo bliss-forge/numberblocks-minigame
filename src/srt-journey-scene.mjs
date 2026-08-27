@@ -1,4 +1,5 @@
 import { characterAsset } from "./character-spec.mjs";
+import { applyCharacterNumber } from "./character-image.mjs";
 import {
   CAR_SHAPE_LABELS,
   RIDE_DOOR,
@@ -36,7 +37,7 @@ function markedText(document, markClass, textClass, mark, text) {
 function playerImage(document) {
   const image = document.createElement("img");
   image.className = "srt-player";
-  image.src = `assets/characters/${characterAsset(1)}`;
+  applyCharacterNumber(image, 1);
   image.alt = "숫자 1 블록 친구";
   return image;
 }
@@ -112,7 +113,7 @@ function seatTicket(document, target) {
   car.className = "srt-ticket-car";
   const friend = document.createElement("img");
   friend.className = "srt-ticket-friend";
-  friend.src = `assets/characters/${characterAsset(target.car)}`;
+  applyCharacterNumber(friend, target.car);
   friend.alt = `숫자 ${target.car} 블록 친구`;
   const carLabel = document.createElement("span");
   carLabel.className = "srt-ticket-car-label";
@@ -142,7 +143,7 @@ function renderSeatPhase(document, state, stage) {
       banner.dataset.target = "true";
       const friend = document.createElement("img");
       friend.className = "srt-car-friend";
-      friend.src = `assets/characters/${characterAsset(car)}`;
+      applyCharacterNumber(friend, car);
       friend.alt = "";
       friend.setAttribute("aria-hidden", "true");
       const label = document.createElement("span");

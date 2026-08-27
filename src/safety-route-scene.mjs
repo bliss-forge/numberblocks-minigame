@@ -1,6 +1,7 @@
 import { characterAsset } from "./character-spec.mjs";
 import { moverPoint } from "./safety-route-movers.mjs";
 import { crossingClearance } from "./safety-route-model.mjs";
+import { applyCharacterNumber } from "./character-image.mjs";
 import {
   bicycleSvg,
   busShelterSvg,
@@ -84,7 +85,7 @@ function resolvedView(state, requestedView = {}) {
 function characterImage(document, number, className) {
   const image = document.createElement("img");
   image.className = className;
-  image.src = `assets/characters/${characterAsset(number)}`;
+  applyCharacterNumber(image, number);
   image.alt = `숫자 ${number} 블록 친구`;
   image.dataset.number = String(number);
   image.addEventListener("error", () => {

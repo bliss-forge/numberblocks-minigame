@@ -9,6 +9,7 @@ import {
   RAINBOW_COUNT,
   josa
 } from "./paint-play-data.mjs";
+import { applyCharacterSource } from "./character-image.mjs";
 import {
   currentRound,
   currentSubject,
@@ -343,7 +344,7 @@ function buildHost(document, state) {
   const host = el(document, "div", "pp-host");
   const img = document.createElement("img");
   img.className = "pp-host-img";
-  img.src = "assets/characters/seven.png";
+  applyCharacterSource(img, "seven.png");
   img.alt = "무지개 일곱이";
   host.append(img);
   const bubble = el(document, "div", "pp-bubble");
@@ -453,7 +454,7 @@ function buildShelf(document, state) {
     if (!tube.unlocked) {
       const mascot = document.createElement("img");
       mascot.className = "pp-tube-mascot";
-      mascot.src = `assets/characters/${tube.char}.png`;
+      applyCharacterSource(mascot, `${tube.char}.png`);
       mascot.alt = "";
       button.append(mascot);
     }
