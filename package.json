@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "assets:preload": "node scripts/sync_modulepreload.mjs",
+    "assets:webp": "python3 scripts/generate_character_webp.py",
     "metrics:characters": "node scripts/generate_character_visual_metrics.mjs",
     "render:characters": "node scripts/render_character_pack.mjs --from 11 --to 150 && npm run metrics:characters",
     "test": "node --test tests/*.test.mjs"

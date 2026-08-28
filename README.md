@@ -265,6 +265,20 @@ npm test        # node --test tests/*.test.mjs
 
 ---
 
+## 놀이 하나 더 붙이려면
+
+카드 계약부터 모델·장면 분리, 음성 세 곳 등록, 테스트 네 종류, 배포까지의
+순서를 **[docs/adding-a-game.md](docs/adding-a-game.md)** 에 정리했습니다.
+열 번을 붙이며 밟은 함정도 같이 담았습니다.
+
+```bash
+npm run assets:webp       # 새 캐릭터 원본의 WebP 파생본 생성
+npm run assets:preload    # 새 모듈을 부팅 힌트에 반영
+npm test                  # 실패 0
+```
+
+---
+
 ## 배포
 
 `main`에 올라가면 GitHub Pages가 그대로 서빙합니다 — 빌드 단계가 없습니다.
